@@ -1,11 +1,10 @@
 """
-safety_system.py - 안전 통제 및 비즈니스 로직 룰 엔진 (SafetyManager)
-운전자 상태에 따라 경고 레벨 판정 + 자동 모드 시 차량 환경 프리셋 결정
+safety_system.py - 안전 통제 및 비즈니스 로직 룰 엔진
+운전자 상태에 따라 경고 레벨 판정 및 에어컨 자동 제어 규칙을 정의한다.
 """
 
 
 class SafetyManager:
-    """AI 비전 데이터와 차량 센서 데이터를 종합하여 위기 상황을 판정하는 클래스."""
 
     def __init__(self):
         self.current_state = "normal"
@@ -13,28 +12,26 @@ class SafetyManager:
         self.color = "#3498db"
         self.should_beep = False
 
-    def evaluate(self, is_drowsy, emotion, rapid_accel):
-        """복합 조건을 평가하여 경고 레벨을 결정한다."""
+    def evaluate(self, is_drowsy, emotion):
         self.should_beep = False
-        dominant_emotion = emotion.get("dominant", "neutral")
+        dominant = emotion.get("dominant", "neutral")
 
         if is_drowsy:
             self.current_state = "danger"
-            self.message = "⚠ 졸음 감지! 주의하세요!"
+            self.message = "⚠ 졸음 감지! 주의하십시오!"
             self.color = "#e74c3c"
             self.should_beep = True
-        elif dominant_emotion == "angry" and rapid_accel:
-            self.current_state = "danger"
-            self.message = "⚠ 위험 운전 감지! (분노 + 급가속)"
-            self.color = "#e74c3c"
-            self.should_beep = True
-        elif dominant_emotion in ("angry", "fear", "disgust"):
+        elif dominant in ("angry", "disgust"):
             self.current_state = "warning"
-            self.message = f"😤 {dominant_emotion.capitalize()} 상태 감지"
-            self.color = "#e67e22" if dominant_emotion in ("angry", "disgust") else "#9b59b6"
-        elif dominant_emotion == "happy":
+            self.message = f"😡 분노/불쾌 상태 감지 ({dominant.capitalize()})"
+            self.color = "#e67e22"
+        elif dominant in ("fear", "sad"):
+            self.current_state = "warning"
+            self.message = f"😰 불안/우울 상태 감지 ({dominant.capitalize()})"
+            self.color = "#9b59b6"
+        elif dominant == "happy":
             self.current_state = "normal"
-            self.message = ""
+            self.message = "😊 즐거운 주행 중"
             self.color = "#2ecc71"
         else:
             self.current_state = "normal"
@@ -49,61 +46,56 @@ class SafetyManager:
         }
 
     def get_auto_environment(self, is_drowsy, emotion):
-        """현재 운전자 상태에 따라 자동 차량 환경 프리셋을 반환한다."""
+        """운전자 상태에 따른 단일 에어컨 자동 제어 프리셋과 로그를 반환한다."""
         dominant = emotion.get("dominant", "neutral")
 
         if is_drowsy:
             return {
-                "ac_on": True,
-                "ac_temp": 18,
-                "ac_fan_speed": 5,
-                "light_color_name": "경고 (빨강)",
-                "light_color_hex": "#e74c3c",
-                "light_brightness": 100,
-                "music_genre": "없음",
-                "music_volume": 0,
+                "preset": {
+                    "ac_on": True,
+                    "ac_temp": 17,
+                    "ac_fan_speed": 5,
+                },
+                "log": "😪 졸음 감지 → 온도를 17°C로 낮추고 바람을 최대로 틉니다.",
+                "log_color": "#e74c3c",
             }
         elif dominant in ("angry", "disgust"):
             return {
-                "ac_on": True,
-                "ac_temp": 22,
-                "ac_fan_speed": 2,
-                "light_color_name": "기본 (파랑)",
-                "light_color_hex": "#3498db",
-                "light_brightness": 60,
-                "music_genre": "클래식",
-                "music_volume": 60,
+                "preset": {
+                    "ac_on": True,
+                    "ac_temp": 21,
+                    "ac_fan_speed": 3,
+                },
+                "log": "😡 분노 감지 → 21°C 냉풍으로 열기를 진정시킵니다.",
+                "log_color": "#e67e22",
             }
         elif dominant in ("fear", "sad"):
             return {
-                "ac_on": True,
-                "ac_temp": 24,
-                "ac_fan_speed": 2,
-                "light_color_name": "집중 (보라)",
-                "light_color_hex": "#9b59b6",
-                "light_brightness": 50,
-                "music_genre": "Lo-Fi",
-                "music_volume": 50,
+                "preset": {
+                    "ac_on": True,
+                    "ac_temp": 24,
+                    "ac_fan_speed": 2,
+                },
+                "log": "😰 불안/우울 감지 → 따뜻한 24°C 온풍으로 안정화합니다.",
+                "log_color": "#9b59b6",
             }
         elif dominant == "happy":
             return {
-                "ac_on": True,
-                "ac_temp": 22,
-                "ac_fan_speed": 2,
-                "light_color_name": "편안함 (녹색)",
-                "light_color_hex": "#2ecc71",
-                "light_brightness": 60,
-                "music_genre": "Jazz",
-                "music_volume": 50,
+                "preset": {
+                    "ac_on": True,
+                    "ac_temp": 22,
+                    "ac_fan_speed": 1,
+                },
+                "log": "😊 행복 감지 → 쾌적한 22°C 상태를 유지합니다.",
+                "log_color": "#2ecc71",
             }
-        else:  # neutral / surprise
+        else:
             return {
-                "ac_on": True,
-                "ac_temp": 22,
-                "ac_fan_speed": 2,
-                "light_color_name": "차분함 (하늘)",
-                "light_color_hex": "#1abc9c",
-                "light_brightness": 50,
-                "music_genre": "Lo-Fi",
-                "music_volume": 40,
+                "preset": {
+                    "ac_on": True,
+                    "ac_temp": 22,
+                    "ac_fan_speed": 1,
+                },
+                "log": "😐 평온 → 표준 22°C 상태를 유지합니다.",
+                "log_color": "#3498db",
             }
