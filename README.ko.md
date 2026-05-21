@@ -1,4 +1,4 @@
--# 🤖 이 프로그램은 AI(Antigravity)에 의해 작성된 스마트 차량 제어 시스템입니다.
+🤖 이 프로그램은 AI의 도움을 활용해 작성된 스마트 차량 제어 시스템입니다.
 
 # 🚗 SEAVS: Smart Emotion-Aware Vehicle System
 > **AI 감정 분석 및 졸음 감지 기술 기반 스마트 차량 콕핏 대시보드 시뮬레이터**

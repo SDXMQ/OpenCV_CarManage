@@ -1,4 +1,4 @@
--# 🤖 This program is built by AI (Antigravity).
+🤖 This program is built with assist by AI.
 
 # 🚗 SEAVS: Smart Emotion-Aware Vehicle System
 > **AI Emotion Analysis & Drowsiness Detection Based Smart Vehicle Cockpit Dashboard Simulator**
