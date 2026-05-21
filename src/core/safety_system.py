@@ -52,6 +52,7 @@ class SafetyManager:
         if is_drowsy:
             return {
                 "preset": {
+                    "power_on": True,
                     "ac_on": True,
                     "ac_temp": 17,
                     "ac_fan_speed": 5,
@@ -62,6 +63,7 @@ class SafetyManager:
         elif dominant in ("angry", "disgust"):
             return {
                 "preset": {
+                    "power_on": True,
                     "ac_on": True,
                     "ac_temp": 21,
                     "ac_fan_speed": 3,
@@ -72,6 +74,7 @@ class SafetyManager:
         elif dominant in ("fear", "sad"):
             return {
                 "preset": {
+                    "power_on": True,
                     "ac_on": True,
                     "ac_temp": 24,
                     "ac_fan_speed": 2,
@@ -82,6 +85,7 @@ class SafetyManager:
         elif dominant == "happy":
             return {
                 "preset": {
+                    "power_on": True,
                     "ac_on": True,
                     "ac_temp": 22,
                     "ac_fan_speed": 1,
@@ -92,6 +96,7 @@ class SafetyManager:
         else:
             return {
                 "preset": {
+                    "power_on": True,
                     "ac_on": True,
                     "ac_temp": 22,
                     "ac_fan_speed": 1,
@@ -99,3 +104,4 @@ class SafetyManager:
                 "log": "😐 평온 → 표준 22°C 상태를 유지합니다.",
                 "log_color": "#3498db",
             }
+
