@@ -1,0 +1,6 @@
+customtkinter
+Pillow
+opencv-python
+mediapipe
+paho-mqtt
+pygrabber
