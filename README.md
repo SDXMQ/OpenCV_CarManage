@@ -35,8 +35,8 @@
 
 * **Language:** `Python 3.10+`
 * **UI Framework:** `CustomTkinter`, `Pillow`
-* **AI & Computer Vision:** `OpenCV (opencv-python)`, `MediaPipe`, `ONNX Runtime`
-* **Protocols & Utilities:** `paho-mqtt` (for simulation telemetry), `pygrabber` (for automated camera device list querying)
+* **AI & Computer Vision:** `OpenCV (opencv-python)` (DNN module for ONNX model inference), `MediaPipe`
+* **Protocols & Utilities:** `paho-mqtt` (Optional legacy telemetry client), `pygrabber` (for automated camera device list querying)
 
 ---
 
@@ -71,7 +71,8 @@ OpenCV_CarManage/
         ├── header.py          # Top navigation (Auto Mode toggle, Audio toggle)
         ├── driver_seat.py     # Camera viewport and driver status monitoring panel
         ├── center_display.py  # Logs screen, detail charts, and safety banners
-        └── ac_panel.py        # Interactive HVAC system controls & air motion graphics
+        ├── ac_panel.py        # Interactive HVAC system controls & air motion graphics
+        └── tooltip.py         # CustomTkinter hover tooltip utility
 ```
 
 ---
@@ -101,12 +102,15 @@ Run **`run.bat`** in the project root folder (Double-click or run from CLI):
 
 The system continuously evaluates telemetric and behavioral data in the background to apply preventive safety actions.
 
-| Driver State | Safety Evaluation | Vehicle Action |
+| Driver State | Safety Evaluation | Vehicle Action (in AI Auto Mode) |
 | :--- | :--- | :--- |
-| **Normal (Neutral / Happy)** | Safe Driving Condition | Maintained current HVAC settings |
-| **Anger Detected (Angry)** | Caution Advised | Warning banner displayed; recommends relaxing environments |
-| **Drowsiness (Drowsy, EAR Drop)** | **⚠️ DANGEROUS! Drowsiness Detected** | Flashes yellow dashboard alerts, plays beep sound, forces A/C ON, sets temperature low, and raises fan speed to maximum. |
-| **Face Not Detected** | **⚠️ Driver Missing / Out of View** | Triggers visual alert banner prompting safety inspection |
+| **Normal (Neutral)** | 😊 Safe Driving Condition | Maintained default/standard settings (22°C, auto HVAC) |
+| **Happy** | 😊 Pleasant Driving Status | Standard settings with Green ambient light |
+| **Anger / Disgust (Stress)** | 😤 Stress / Fatigue Accumulation | Amber ambient light, 21°C external ventilation (indirect airflow), Classic genre (35% vol), Seat ventilation level 1 |
+| **Yawning (Warning)** | 🥱 Yawning Detected (Drowsiness Precursor) | Orange dashboard alert, warning beep, 19°C external ventilation (direct airflow), Pop genre (60% vol), Seat ventilation level 2 |
+| **Drowsiness (Danger)** | 🚨 DANGEROUS! Drowsiness Detected | Flashes red dashboard alerts, continuous warning beeps, forces A/C ON at 17°C (max fan speed), external ventilation, direct airflow, Dance genre (80% vol), Seat ventilation level 3, Window tilting open, Haptic vibration ON |
+| **Sunlight Glare (with Stress)** | ☀ Sunlight Glare Detected | Display dark mode (40% brightness), Amber ambient light, indirect airflow |
+| **Fear / Sadness (Low Engagement)** | 😶 Low Engagement Detected | Green ambient light, 24°C external ventilation (indirect airflow), Classic genre (25% vol), Seat heater level 1 |
 
 ---
 
