@@ -1,5 +1,5 @@
 """
-ac_panel.py - 하단 에어컨 제어판 UI 컴포넌트 (실시간 팬 & 바람 애니메이션 포함)
+ac_panel.py - 하단 에어컨 제어판 및 다감각 차량 제어 상태 UI 컴포넌트
 """
 
 import math
@@ -7,11 +7,12 @@ import customtkinter as ctk
 
 class AcPanelFrame(ctk.CTkFrame):
     def __init__(self, master, power_var, ac_var, on_power_toggle, on_ac_toggle, on_temp_change, on_fan_change,
+                 on_vent_click, on_win_click, on_air_click, on_audio_click, on_seat_click, on_haptic_click,
                  panel_color="#12121c", accent_color="#00d2ff", main_color="#ecf0f1"):
         super().__init__(master, height=140, corner_radius=14,
                          fg_color=panel_color, border_width=2, border_color="#22223b")
         self.pack_propagate(False)
-        self.grid_columnconfigure((0, 1, 2), weight=1)
+        self.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self._accent = accent_color
         self._main = main_color
@@ -56,7 +57,6 @@ class AcPanelFrame(ctk.CTkFrame):
         ctrl_zone = ctk.CTkFrame(self, fg_color="#0d0d1a", corner_radius=10)
         ctrl_zone.grid(row=0, column=1, sticky="nsew", padx=4, pady=8)
 
-        # 전원/AC 스위치 가로 배치 프레임
         switch_frame = ctk.CTkFrame(ctrl_zone, fg_color="transparent")
         switch_frame.pack(pady=(12, 8))
 
@@ -83,15 +83,14 @@ class AcPanelFrame(ctk.CTkFrame):
         self._temp_slider.set(22)
         self._temp_slider.pack(pady=4)
 
-        # 3. 우: 풍량 제어 슬라이더 및 팬/바람 애니메이션 구역
+        # 3. 풍량 제어 슬라이더 및 팬/바람 애니메이션 구역
         fan_zone = ctk.CTkFrame(self, fg_color="#0d0d1a", corner_radius=10)
-        fan_zone.grid(row=0, column=2, sticky="nsew", padx=(4, 8), pady=8)
+        fan_zone.grid(row=0, column=2, sticky="nsew", padx=4, pady=8)
 
         ctk.CTkLabel(fan_zone, text="FAN SPEED",
                      font=ctk.CTkFont(family="Consolas", size=10, weight="bold"),
                      text_color=self._accent).pack(pady=(10, 0))
 
-        # 실시간 그래픽 캔버스 생성
         self._canvas = ctk.CTkCanvas(fan_zone, width=80, height=56, bg="#0d0d1a", highlightthickness=0)
         self._canvas.pack(pady=(2, 0))
 
@@ -105,9 +104,45 @@ class AcPanelFrame(ctk.CTkFrame):
         self._fan_slider.set(1)
         self._fan_slider.pack(pady=2)
 
+        # 4. 우: 다감각 차량 제어 상태 (Vehicle Control Status)
+        status_zone = ctk.CTkFrame(self, fg_color="#0d0d1a", corner_radius=10)
+        status_zone.grid(row=0, column=3, sticky="nsew", padx=(4, 8), pady=8)
+
+        ctk.CTkLabel(status_zone, text="VEHICLE STATUS",
+                     font=ctk.CTkFont(family="Consolas", size=10, weight="bold"),
+                     text_color=self._accent).pack(pady=(8, 4))
+
+        # 상태 버튼 그리드
+        badge_f = ctk.CTkFrame(status_zone, fg_color="transparent")
+        badge_f.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        badge_f.grid_columnconfigure((0, 1), weight=1)
+
+        # 환기 버튼
+        self._vent_lbl = self._make_badge_button(badge_f, "♻ 내기순환", 0, 0, on_vent_click)
+        # 창문 버튼
+        self._win_lbl = self._make_badge_button(badge_f, "🪟 닫힘", 0, 1, on_win_click)
+        # 풍향 버튼
+        self._air_lbl = self._make_badge_button(badge_f, "🍃 간접풍", 1, 0, on_air_click)
+        # 오디오 버튼
+        self._audio_lbl = self._make_badge_button(badge_f, "🎵 None", 1, 1, on_audio_click)
+        # 시트 버튼
+        self._seat_lbl = self._make_badge_button(badge_f, "💺 OFF", 2, 0, on_seat_click)
+        # 햅틱 버튼
+        self._haptic_lbl = self._make_badge_button(badge_f, "📳 OFF", 2, 1, on_haptic_click)
+
         # 초기 애니메이션 상태 렌더링
         self.animate_step()
 
+    def _make_badge_button(self, parent, text, row, col, command):
+        btn = ctk.CTkButton(parent, text=text,
+                            font=ctk.CTkFont(family="Malgun Gothic", size=10, weight="bold"),
+                            text_color="#8899aa",
+                            fg_color="#161625", hover_color="#222235",
+                            corner_radius=6,
+                            width=90, height=24,
+                            command=command)
+        btn.grid(row=row, column=col, padx=2, pady=2, sticky="ew")
+        return btn
 
     def update_ac_state(self, cabin_temp, ac_temp, ac_fan_speed, power_on, ac_on):
         self._cabin_temp = cabin_temp
@@ -116,15 +151,12 @@ class AcPanelFrame(ctk.CTkFrame):
         self._power_on = power_on
         self._ac_on = ac_on
 
-        # UI 라벨 갱신
         self._cabin_val.configure(text=f"{cabin_temp:.1f}°C")
         self._set_val.configure(text=f"{ac_temp}°C")
         self._temp_slider.set(ac_temp)
         self._fan_val.configure(text=f"{ac_fan_speed} 단")
         self._fan_slider.set(ac_fan_speed)
 
-        # 실내 온도에 따른 동적 컬러 설정
-        # Cool (<21°C): #00d2ff, Comfort (21°C ~ 25.9°C): #2ecc71, Hot (>=26°C): #e74c3c
         color = "#2ecc71"
         if cabin_temp >= 26.0:
             color = "#e74c3c"
@@ -134,22 +166,88 @@ class AcPanelFrame(ctk.CTkFrame):
         self._cabin_val.configure(text_color=color)
         self._cabin_title.configure(text_color=color)
 
+    def update_vehicle_status(self, vent_mode, window, airflow, genre, volume,
+                              seat_vent, seat_heat, haptic):
+        """다감각 제어 상태 배지를 실시간으로 업데이트한다."""
+        # 환기
+        if vent_mode == "external":
+            self._vent_lbl.configure(text="💨 외기유입", text_color="#00d2ff")
+        else:
+            self._vent_lbl.configure(text="♻ 내기순환", text_color="#8899aa")
+
+        # 창문
+        if window:
+            self._win_lbl.configure(text="🪟 틸팅 열림", text_color="#f39c12")
+        else:
+            self._win_lbl.configure(text="🪟 닫힘", text_color="#8899aa")
+
+        # 풍향
+        if airflow == "direct":
+            self._air_lbl.configure(text="🌀 직바람", text_color="#e74c3c")
+        else:
+            self._air_lbl.configure(text="🍃 간접풍", text_color="#8899aa")
+
+        # 오디오
+        if genre and genre != "None":
+            self._audio_lbl.configure(text=f"🎵 {genre} {volume}%", text_color="#2ecc71")
+        else:
+            self._audio_lbl.configure(text="🎵 None", text_color="#8899aa")
+
+        # 시트
+        if seat_vent > 0:
+            self._seat_lbl.configure(text=f"💺 통풍 {seat_vent}단", text_color="#00d2ff")
+        elif seat_heat > 0:
+            self._seat_lbl.configure(text=f"♨ 열선 {seat_heat}단", text_color="#e67e22")
+        else:
+            self._seat_lbl.configure(text="💺 OFF", text_color="#8899aa")
+
+        # 햅틱
+        if haptic:
+            self._haptic_lbl.configure(text="📳 진동 ON", text_color="#e74c3c")
+        else:
+            self._haptic_lbl.configure(text="📳 OFF", text_color="#8899aa")
+
     def set_interactive_state(self, power_on, auto_mode):
-        self._power_switch.configure(state="normal")
-        
-        if not power_on:
+        # 1. HVAC 슬라이더 및 스위치 인터랙션 상태 정의
+        if auto_mode:
+            self._power_switch.configure(state="disabled")
             self._ac_switch.configure(state="disabled")
             self._temp_slider.configure(state="disabled")
             self._fan_slider.configure(state="disabled")
+            
+            # 다감각 수동 제어 버튼도 자동 제어 시에는 전부 비활성화
+            self._vent_lbl.configure(state="disabled")
+            self._win_lbl.configure(state="disabled")
+            self._air_lbl.configure(state="disabled")
+            self._audio_lbl.configure(state="disabled")
+            self._seat_lbl.configure(state="disabled")
+            self._haptic_lbl.configure(state="disabled")
         else:
-            if auto_mode:
+            self._power_switch.configure(state="normal")
+            if not power_on:
                 self._ac_switch.configure(state="disabled")
                 self._temp_slider.configure(state="disabled")
                 self._fan_slider.configure(state="disabled")
+                
+                # 전원 꺼졌을 때는 수동 버튼도 비활성화
+                self._vent_lbl.configure(state="disabled")
+                self._win_lbl.configure(state="disabled")
+                self._air_lbl.configure(state="disabled")
+                self._audio_lbl.configure(state="disabled")
+                self._seat_lbl.configure(state="disabled")
+                self._haptic_lbl.configure(state="disabled")
             else:
                 self._ac_switch.configure(state="normal")
                 self._temp_slider.configure(state="normal")
                 self._fan_slider.configure(state="normal")
+                
+                # 전원 켜져 있고 수동 제어 모드일 때는 수동 버튼들 전부 활성화
+                self._vent_lbl.configure(state="normal")
+                self._win_lbl.configure(state="normal")
+                self._air_lbl.configure(state="normal")
+                self._audio_lbl.configure(state="normal")
+                self._seat_lbl.configure(state="normal")
+                self._haptic_lbl.configure(state="normal")
 
     def set_accent_border(self, is_active):
         if is_active:
@@ -165,32 +263,27 @@ class AcPanelFrame(ctk.CTkFrame):
         ac_temp = getattr(self, "_ac_temp", 22)
         fan_speed = getattr(self, "_ac_fan_speed", 1)
 
-        # 1. 목표 속도 계산
         target_speed = fan_speed * 12.0 if (power_on and fan_speed > 0) else 0.0
         self._current_speed += (target_speed - self._current_speed) * 0.15
 
-        # 각도 및 바람 물결 오프셋 업데이트
         self._fan_angle = (self._fan_angle + self._current_speed) % 360
         self._wind_offset = (self._wind_offset + self._current_speed * 0.12) % 100
 
-        # 2. 캔버스 초기화
         self._canvas.delete("all")
 
-        cx, cy = 40, 28 # 캔버스 중앙점
-        r = 15          # 팬 반지름
+        cx, cy = 40, 28
+        r = 15
 
-        # 3. 공조 모드에 따른 바람/팬 색상 동적 결정
         if power_on and fan_speed > 0:
             if not ac_on and ac_temp > cabin_temp:
-                wind_color = "#e67e22"  # 히터 (온풍): 주황색 (A/C 꺼져있을 때)
+                wind_color = "#e67e22"
             elif ac_on and ac_temp < cabin_temp:
-                wind_color = "#00d2ff"  # 냉방 (에어컨): 하늘색
+                wind_color = "#00d2ff"
             else:
-                wind_color = "#aaaaaa"  # 송풍 (바람만): 회색
+                wind_color = "#aaaaaa"
         else:
             wind_color = self._accent
 
-        # 4. 바람 물결선 그리기
         if self._current_speed > 0.1:
             for base_y in [cy - 12, cy + 12]:
                 points = []
@@ -204,7 +297,6 @@ class AcPanelFrame(ctk.CTkFrame):
                 width = int(min(self._current_speed * 0.05 + 1.0, 2.5))
                 self._canvas.create_line(points, fill=wind_color, width=width, smooth=True)
 
-        # 5. 팬 날개 3개 그리기
         fan_color = wind_color if (power_on and fan_speed > 0) else self._accent
         for offset in [0, 120, 240]:
             start_ang = (self._fan_angle + offset) % 360
@@ -214,13 +306,12 @@ class AcPanelFrame(ctk.CTkFrame):
                 fill=fan_color, outline=""
             )
 
-        # 6. 중앙 코어 그리기
         self._canvas.create_oval(cx - 4, cy - 4, cx + 4, cy + 4, fill=self._main, outline="")
 
     def reset_ui(self):
         self.update_ac_state(25.0, 22, 1, False, False)
+        self.update_vehicle_status("internal", False, "indirect", "None", 30, 0, 0, False)
         self.set_interactive_state(False, False)
         self.set_accent_border(False)
         self._current_speed = 0.0
         self.animate_step()
-

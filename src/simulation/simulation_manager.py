@@ -59,50 +59,55 @@ class SimulationManager:
         frame_rgb = self._camera.get_frame_rgb()
         emotion = self._camera.emotion
         ear_value = self._camera.ear_value
+        mar_value = self._camera.mar_value
         is_drowsy = self._camera.is_drowsy
+        is_yawning = self._camera.is_yawning
 
-        # 2. 안전 평가
-        safety_eval = self._safety.evaluate(is_drowsy, emotion)
+        # 2. 안전 평가 (환경 맥락 포함)
+        safety_eval = self._safety.evaluate(
+            is_drowsy, is_yawning, emotion,
+            sunlight_glare=self._env.sunlight_glare
+        )
 
         # 3. 오디오 비프음 재생 트리거
         if safety_eval["should_beep"] and audio_enabled:
             threading.Thread(target=lambda: winsound.Beep(1000, 300), daemon=True).start()
 
-        # 4. AI 에어컨 자동 제어 로직 적용
+        # 4. AI 다감각 자동 제어 로직 적용
         ai_log = None
         ai_log_color = None
         if auto_mode_active:
-            ai_log, ai_log_color = self._apply_auto(is_drowsy, emotion)
+            ai_log, ai_log_color = self._apply_auto(
+                is_drowsy, is_yawning, emotion
+            )
             self._animate_sliders()
 
-        # 5. 차량 실내 온도 물리 시뮬레이션
+        # 5. CO2 물리 시뮬레이션
+        self._simulate_co2()
+
+        # 6. 차량 실내 온도 물리 시뮬레이션
         ambient_temp = 28.0  # 실외 온도
         if self._env.power_on:
-            # 전원이 켜진 경우
             if not self._env.ac_on and self._env.ac_temp > self._env.cabin_temp:
-                # 1) 온풍 기능(히터) 가동: A/C 꺼짐 + 설정 온도가 실내 온도보다 높음
                 diff = self._env.ac_temp - self._env.cabin_temp
                 self._env.cabin_temp += 0.001 * self._env.ac_fan_speed * diff
             elif self._env.ac_on and self._env.ac_temp < self._env.cabin_temp:
-                # 2) 냉방 기능 가동: A/C 켜짐 + 설정 온도가 실내 온도보다 낮음
                 diff = self._env.cabin_temp - self._env.ac_temp
                 self._env.cabin_temp -= 0.001 * self._env.ac_fan_speed * diff
             else:
-                # 3) 송풍 상태 (설정 온도가 낮지만 A/C 가 꺼져있거나, A/C 켜져있는데 설정 온도가 높은 경우 등)
-                # 자연스럽게 실외 온도로 수렴함
                 self._env.cabin_temp += 0.0003 * (ambient_temp - self._env.cabin_temp)
         else:
-            # 전원이 꺼진 경우: 엔진 열 및 외부 복사열로 실외 온도로 자연 수렴
             self._env.cabin_temp += 0.0006 * (ambient_temp - self._env.cabin_temp)
 
-        # 온도 상하한 제한 [15.0, 35.0]
         self._env.cabin_temp = max(15.0, min(35.0, self._env.cabin_temp))
 
         return {
             "frame_rgb": frame_rgb,
             "emotion": emotion,
             "ear_value": ear_value,
+            "mar_value": mar_value,
             "is_drowsy": is_drowsy,
+            "is_yawning": is_yawning,
             "safety_eval": safety_eval,
             "ai_log": ai_log,
             "ai_log_color": ai_log_color,
@@ -110,21 +115,53 @@ class SimulationManager:
             "ac_on": self._env.ac_on,
             "ac_temp": self._env.ac_temp,
             "ac_fan_speed": self._env.ac_fan_speed,
-            "cabin_temp": self._env.cabin_temp
+            "cabin_temp": self._env.cabin_temp,
+            # 다감각 제어 상태
+            "ventilation_mode": self._env.ventilation_mode,
+            "window_tilting": self._env.window_tilting,
+            "airflow_direction": self._env.airflow_direction,
+            "audio_genre": self._env.audio_genre,
+            "audio_volume": self._env.audio_volume,
+            "ambient_light": self._env.ambient_light,
+            "display_dark_mode": self._env.display_dark_mode,
+            "display_brightness": self._env.display_brightness,
+            "seat_ventilation": self._env.seat_ventilation,
+            "seat_heater": self._env.seat_heater,
+            "haptic_vibration": self._env.haptic_vibration,
+            # 환경 시뮬레이션
+            "co2_level": self._env.co2_level,
         }
 
 
-    def _apply_auto(self, is_drowsy, emotion):
-        """AI 분석 결과를 가져와서 에어컨 목표 상태값을 갱신한다."""
-        res = self._safety.get_auto_environment(is_drowsy, emotion)
+    def _apply_auto(self, is_drowsy, is_yawning, emotion):
+        """AI 분석 결과를 가져와서 다감각 차량 목표 상태값을 갱신한다."""
+        res = self._safety.get_auto_environment(
+            is_drowsy, is_yawning, emotion,
+            sunlight_glare=self._env.sunlight_glare,
+            tunnel_entry=self._env.tunnel_entry,
+            co2_level=self._env.co2_level,
+            speed=self._env.speed
+        )
         preset = res["preset"]
 
+        # HVAC 기본 상태 적용
         self._env.power_on = preset.get("power_on", True)
         self._env.ac_on = preset["ac_on"]
-
-        # 목표값 갱신
         self.target_temp = preset["ac_temp"]
         self.target_fan = preset["ac_fan_speed"]
+
+        # 다감각 제어 상태 즉시 적용
+        self._env.ventilation_mode = preset.get("ventilation_mode", "internal")
+        self._env.window_tilting = preset.get("window_tilting", False)
+        self._env.airflow_direction = preset.get("airflow_direction", "indirect")
+        self._env.audio_genre = preset.get("audio_genre", "None")
+        self._env.audio_volume = preset.get("audio_volume", 30)
+        self._env.ambient_light = preset.get("ambient_light", "Off")
+        self._env.display_dark_mode = preset.get("display_dark_mode", False)
+        self._env.display_brightness = preset.get("display_brightness", 80)
+        self._env.seat_ventilation = preset.get("seat_ventilation", 0)
+        self._env.seat_heater = preset.get("seat_heater", 0)
+        self._env.haptic_vibration = preset.get("haptic_vibration", False)
 
         # 로그 메시지가 변경된 경우에만 반환하여 기록하게 함
         if self._last_ai_log != res["log"]:
@@ -133,6 +170,16 @@ class SimulationManager:
 
         return None, None
 
+    def _simulate_co2(self):
+        """내기/외기 순환 및 창문 상태에 따른 CO2 농도 변화 시뮬레이션."""
+        if self._env.ventilation_mode == "external" or self._env.window_tilting:
+            # 외기유입 또는 창문 개방 → CO2 서서히 하락 (현실적인 속도로 보정)
+            self._env.co2_level -= 0.1 * (self._env.co2_level - 450.0) * 0.01
+        else:
+            # 내기순환 → CO2 서서히 상승 (승객 호흡)
+            self._env.co2_level += 0.3
+
+        self._env.co2_level = max(400.0, min(2500.0, self._env.co2_level))
 
     def _animate_sliders(self):
         """AI가 설정한 목표값으로 슬라이더 값을 0.2초마다 1단씩 부드럽게 조정한다."""

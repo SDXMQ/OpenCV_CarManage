@@ -30,8 +30,11 @@ class VideoCamera:
         # 상태 관리
         self._current_frame = None       # 원본이 아닌 '그려진' 프레임
         self._ear_value = 0.0
+        self._mar_value = 0.0
         self._is_drowsy = False
+        self._is_yawning = False
         self._drowsy_start = None
+        self._yawn_start = None
         self._emotion = {"dominant": "neutral", "scores": {}}
 
         # 스레드 버퍼
@@ -46,9 +49,19 @@ class VideoCamera:
             return self._ear_value
 
     @property
+    def mar_value(self):
+        with self._lock:
+            return self._mar_value
+
+    @property
     def is_drowsy(self):
         with self._lock:
             return self._is_drowsy
+
+    @property
+    def is_yawning(self):
+        with self._lock:
+            return self._is_yawning
 
     @property
     def emotion(self):
@@ -89,8 +102,11 @@ class VideoCamera:
         with self._lock:
             self._current_frame = None
             self._is_drowsy = False
+            self._is_yawning = False
             self._ear_value = 0.0
+            self._mar_value = 0.0
             self._drowsy_start = None
+            self._yawn_start = None
             self._emotion = {"dominant": "neutral", "scores": {}}
             self._latest_landmarks = None
 
@@ -123,13 +139,16 @@ class VideoCamera:
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             self._latest_rgb_for_emotion = rgb.copy()
 
-            # EAR 계산 (detectors)
-            ear, landmarks = self._drowsiness_detector.process(rgb)
+            # EAR 및 MAR 계산 (detectors)
+            ear, mar, landmarks = self._drowsiness_detector.process(rgb)
             self._latest_landmarks = landmarks
 
             now = time.time()
             with self._lock:
                 self._ear_value = ear
+                self._mar_value = mar
+
+                # 졸음 판정 (EAR 기반)
                 if ear > 0 and ear < self._ear_threshold:
                     if self._drowsy_start is None:
                         self._drowsy_start = now
@@ -139,12 +158,24 @@ class VideoCamera:
                     self._drowsy_start = None
                     self._is_drowsy = False
 
+                # 하품 판정 (MAR 기반)
+                if mar > 0.50:
+                    if self._yawn_start is None:
+                        self._yawn_start = now
+                    elif now - self._yawn_start >= 1.0:
+                        self._is_yawning = True
+                else:
+                    self._yawn_start = None
+                    self._is_yawning = False
+
                 # 오버레이 그리기 (visualizer)
                 drawn_frame = FrameVisualizer.draw_overlays(
                     frame.copy(), 
-                    self._ear_value, 
+                    self._ear_value,
+                    self._mar_value,
                     self._emotion, 
-                    self._is_drowsy
+                    self._is_drowsy,
+                    self._is_yawning
                 )
                 self._current_frame = drawn_frame
 

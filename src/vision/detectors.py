@@ -20,6 +20,9 @@ class DrowsinessDetector:
     _LEFT_EYE = [33, 160, 158, 133, 153, 144]
     _RIGHT_EYE = [362, 385, 387, 263, 373, 380]
 
+    # MediaPipe Face Landmarker 랜드마크 인덱스 (입 - MAR용)
+    _MOUTH = [78, 81, 311, 308, 402, 178]
+
     _MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
     _MODEL_FILE = os.path.join(os.path.dirname(__file__), "face_landmarker.task")
 
@@ -41,7 +44,9 @@ class DrowsinessDetector:
                 return
 
         try:
-            base_options = python.BaseOptions(model_asset_path=self._MODEL_FILE)
+            with open(self._MODEL_FILE, 'rb') as f:
+                model_data = f.read()
+            base_options = python.BaseOptions(model_asset_buffer=model_data)
             options = vision.FaceLandmarkerOptions(
                 base_options=base_options,
                 output_face_blendshapes=False,
@@ -54,9 +59,9 @@ class DrowsinessDetector:
             print(f"[SEAVS] MediaPipe 얼굴 분석 엔진 초기화 실패: {e}")
 
     def process(self, frame_rgb):
-        """RGB 프레임을 입력받아 EAR(Float)과 랜드마크 정보 리스트를 반환한다."""
+        """RGB 프레임을 입력받아 (EAR, MAR, landmarks)를 반환한다."""
         if self._detector is None:
-            return 0.0, None
+            return 0.0, 0.0, None
 
         # mp.Image 형식으로 변환
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
@@ -68,19 +73,23 @@ class DrowsinessDetector:
                 landmarks = detection_result.face_landmarks[0]
                 h, w = frame_rgb.shape[:2]
                 ear = self._compute_ear(landmarks, w, h)
-                return ear, landmarks
+                mar = self._compute_mar(landmarks, w, h)
+                return ear, mar, landmarks
         except Exception as e:
             print(f"[SEAVS] 얼굴 랜드마크 검출 중 오류 발생: {e}")
             
-        return 0.0, None
+        return 0.0, 0.0, None
 
     def _compute_ear(self, landmarks, w, h):
-        left_ear = self._eye_aspect_ratio(landmarks, self._LEFT_EYE, w, h)
-        right_ear = self._eye_aspect_ratio(landmarks, self._RIGHT_EYE, w, h)
+        left_ear = self._aspect_ratio(landmarks, self._LEFT_EYE, w, h)
+        right_ear = self._aspect_ratio(landmarks, self._RIGHT_EYE, w, h)
         return (left_ear + right_ear) / 2.0
 
+    def _compute_mar(self, landmarks, w, h):
+        return self._aspect_ratio(landmarks, self._MOUTH, w, h)
+
     @staticmethod
-    def _eye_aspect_ratio(landmarks, indices, w, h):
+    def _aspect_ratio(landmarks, indices, w, h):
         pts = []
         for idx in indices:
             lm = landmarks[idx]
@@ -123,7 +132,8 @@ class EmotionDetector:
                 return
 
         try:
-            self._net = cv2.dnn.readNetFromONNX(self._MODEL_FILE)
+            model_data = np.fromfile(self._MODEL_FILE, dtype=np.uint8)
+            self._net = cv2.dnn.readNetFromONNX(model_data)
             print("[SEAVS] ONNX 감정 분석 엔진 활성화 완료.")
         except Exception as e:
             print(f"[SEAVS] ONNX 모델 로딩 중 오류 발생: {e}")

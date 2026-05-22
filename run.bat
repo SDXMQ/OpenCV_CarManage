@@ -11,5 +11,3 @@ pip install -r requirements.txt --quiet
 set PYTHONPATH=%~dp0
 cd src
 python main.py
-
-pause

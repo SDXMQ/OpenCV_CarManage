@@ -1,5 +1,5 @@
 """
-center_display.py - 센터 디스플레이 정보 및 로그 UI 컴포넌트
+center_display.py - 센터 디스플레이 정보, 환경 시뮬레이터 및 로그 UI 컴포넌트
 """
 
 import time
@@ -7,7 +7,10 @@ import customtkinter as ctk
 
 class CenterDisplayFrame(ctk.CTkFrame):
     def __init__(self, master, panel_color="#12121c", screen_color="#0b0c10", accent_color="#00d2ff",
-                 dim_color="#5f6f81", main_color="#ecf0f1"):
+                 dim_color="#5f6f81", main_color="#ecf0f1",
+                 glare_var=None, tunnel_var=None, co2_var=None, speed_var=None,
+                 on_glare_toggle=None, on_tunnel_toggle=None,
+                 on_co2_change=None, on_speed_change=None):
         super().__init__(master, corner_radius=14, fg_color=panel_color, border_width=1, border_color="#22223b")
         
         self._screen_color = screen_color
@@ -17,7 +20,8 @@ class CenterDisplayFrame(ctk.CTkFrame):
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=2)
+        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=2)
 
         # 1. 타이틀
         tf = ctk.CTkFrame(self, fg_color="#0d0d18", height=34, corner_radius=0)
@@ -27,22 +31,22 @@ class CenterDisplayFrame(ctk.CTkFrame):
                      font=ctk.CTkFont(size=12, weight="bold"),
                      text_color=self._dim_color).pack(side="left", padx=12, pady=5)
 
-        # 2. 운전자 상태 상세 카드 (감정 점수 및 경고 배너)
+        # 2. 운전자 상태 상세 카드
         status = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
         status.grid(row=1, column=0, sticky="nsew", padx=10, pady=(8, 4))
         status.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(status, text="DRIVER STATUS",
+        ctk.CTkLabel(status, text="DRIVER STATE",
                      font=ctk.CTkFont(family="Consolas", size=10),
                      text_color=self._accent).grid(row=0, column=0, padx=15, pady=(10, 2), sticky="w")
 
-        self._emo_main = ctk.CTkLabel(status, text="😐 Neutral",
+        self._state_main = ctk.CTkLabel(status, text="😐 정상",
                                       font=ctk.CTkFont(size=28, weight="bold"), text_color=self._main_color)
-        self._emo_main.grid(row=1, column=0, padx=15, sticky="w")
+        self._state_main.grid(row=1, column=0, padx=15, sticky="w")
 
-        self._emo_scores = ctk.CTkLabel(status, text="분석 대기 중...",
+        self._state_scores = ctk.CTkLabel(status, text="분석 대기 중...",
                                         font=ctk.CTkFont(family="Consolas", size=11), text_color=self._dim_color)
-        self._emo_scores.grid(row=2, column=0, padx=15, sticky="w", pady=(0, 4))
+        self._state_scores.grid(row=2, column=0, padx=15, sticky="w", pady=(0, 4))
 
         # 경고 알림판
         self._alert_f = ctk.CTkFrame(status, corner_radius=8, fg_color="transparent", height=44)
@@ -51,9 +55,67 @@ class CenterDisplayFrame(ctk.CTkFrame):
                                        font=ctk.CTkFont(size=14, weight="bold"))
         self._alert_lbl.pack(pady=6, padx=10)
 
-        # 3. AI 시스템 로그 창
+        # 3. 환경 시뮬레이터 패널
+        env_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
+        env_f.grid(row=2, column=0, sticky="nsew", padx=10, pady=(4, 4))
+        env_f.grid_columnconfigure(0, weight=1)
+        env_f.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(env_f, text="🌍 ENVIRONMENT SIMULATOR",
+                     font=ctk.CTkFont(family="Consolas", size=10),
+                     text_color=self._accent).grid(row=0, column=0, columnspan=2, padx=15, pady=(8, 4), sticky="w")
+
+        # 좌측: 스위치 (눈부심, 터널)
+        sw_f = ctk.CTkFrame(env_f, fg_color="transparent")
+        sw_f.grid(row=1, column=0, padx=15, pady=(0, 8), sticky="w")
+
+        self._glare_sw = ctk.CTkSwitch(sw_f, text="☀ 눈부심",
+                                       variable=glare_var, command=on_glare_toggle,
+                                       progress_color="#f39c12",
+                                       font=ctk.CTkFont(size=11))
+        self._glare_sw.pack(anchor="w", pady=2)
+
+        self._tunnel_sw = ctk.CTkSwitch(sw_f, text="🌑 터널/야간",
+                                        variable=tunnel_var, command=on_tunnel_toggle,
+                                        progress_color="#95a5a6",
+                                        font=ctk.CTkFont(size=11))
+        self._tunnel_sw.pack(anchor="w", pady=2)
+
+        # 우측: 슬라이더 (CO2, 속도)
+        sl_f = ctk.CTkFrame(env_f, fg_color="transparent")
+        sl_f.grid(row=1, column=1, padx=(0, 15), pady=(0, 8), sticky="ew")
+
+        co2_row = ctk.CTkFrame(sl_f, fg_color="transparent")
+        co2_row.pack(fill="x", pady=2)
+        ctk.CTkLabel(co2_row, text="CO₂", font=ctk.CTkFont(size=10), text_color=self._dim_color).pack(side="left")
+        self._co2_lbl = ctk.CTkLabel(co2_row, text="800 ppm",
+                                     font=ctk.CTkFont(family="Consolas", size=10, weight="bold"),
+                                     text_color=self._main_color)
+        self._co2_lbl.pack(side="right")
+        self._co2_slider = ctk.CTkSlider(sl_f, from_=400, to=2500, number_of_steps=42,
+                                         command=on_co2_change, height=14,
+                                         button_color="#e67e22")
+        self._co2_slider.set(800)
+        self._co2_slider.pack(fill="x", pady=(0, 4))
+
+        spd_row = ctk.CTkFrame(sl_f, fg_color="transparent")
+        spd_row.pack(fill="x", pady=2)
+        ctk.CTkLabel(spd_row, text="속도", font=ctk.CTkFont(size=10), text_color=self._dim_color).pack(side="left")
+        self._spd_lbl = ctk.CTkLabel(spd_row, text="80 km/h",
+                                     font=ctk.CTkFont(family="Consolas", size=10, weight="bold"),
+                                     text_color=self._main_color)
+        self._spd_lbl.pack(side="right")
+        self._spd_slider = ctk.CTkSlider(sl_f, from_=0, to=200, number_of_steps=40,
+                                         command=on_speed_change, height=14,
+                                         button_color="#3498db")
+        self._spd_slider.set(80)
+        self._spd_slider.pack(fill="x")
+
+
+
+        # 4. AI 시스템 로그 창
         log_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
-        log_f.grid(row=2, column=0, sticky="nsew", padx=10, pady=(4, 10))
+        log_f.grid(row=3, column=0, sticky="nsew", padx=10, pady=(4, 10))
         log_f.grid_columnconfigure(0, weight=1)
         log_f.grid_rowconfigure(1, weight=1)
 
@@ -67,10 +129,16 @@ class CenterDisplayFrame(ctk.CTkFrame):
         self._log.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self._log.configure(state="disabled")
 
-    def update_emotion(self, emotion_text, top_scores_text):
-        self._emo_main.configure(text=emotion_text)
+    def update_state_display(self, state_text, top_scores_text):
+        self._state_main.configure(text=state_text)
         if top_scores_text:
-            self._emo_scores.configure(text=top_scores_text)
+            self._state_scores.configure(text=top_scores_text)
+
+    def update_speed_label(self, speed):
+        self._spd_lbl.configure(text=f"{int(speed)} km/h")
+
+    def update_co2_label(self, co2):
+        self._co2_lbl.configure(text=f"{int(co2)} ppm")
 
     def update_alert(self, message, bg_color):
         if message:
@@ -79,6 +147,11 @@ class CenterDisplayFrame(ctk.CTkFrame):
         else:
             self._alert_f.configure(fg_color="transparent")
             self._alert_lbl.configure(text="")
+
+    def update_env_display(self, co2_level):
+        """CO2 시뮬레이션 물리 변화를 슬라이더 및 라벨에 실시간으로 반영한다."""
+        self._co2_slider.set(co2_level)
+        self._co2_lbl.configure(text=f"{int(co2_level)} ppm")
 
     def write_log(self, text, color):
         ts = time.strftime("%H:%M:%S")
@@ -92,12 +165,15 @@ class CenterDisplayFrame(ctk.CTkFrame):
         self._log.configure(state="disabled")
 
     def reset_ui(self):
-        self._emo_main.configure(text="😐 Neutral")
-        self._emo_scores.configure(text="분석 대기 중...")
+        self._state_main.configure(text="😐 정상")
+        self._state_scores.configure(text="분석 대기 중...")
         self._alert_f.configure(fg_color="transparent")
         self._alert_lbl.configure(text="")
+        self._co2_slider.set(800)
+        self._co2_lbl.configure(text="800 ppm")
+        self._spd_slider.set(80)
+        self._spd_lbl.configure(text="80 km/h")
         
-        # 로그 초기화 (필요시 비움, 또는 정지 메시지만 추가)
         self._log.configure(state="normal")
         self._log.delete("1.0", "end")
         self._log.configure(state="disabled")

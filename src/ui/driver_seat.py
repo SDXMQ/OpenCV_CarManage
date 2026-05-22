@@ -36,19 +36,19 @@ class DriverSeatFrame(ctk.CTkFrame):
                                        font=ctk.CTkFont(size=13), text_color="#3e4a56")
         self._cam_label.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
 
-        # 3. 운전자 상태 요약 스트립
+        # 3. 운전자 상태 요약 스트립 (3열: 상태 | EAR | MAR)
         strip = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=8, height=60)
         strip.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
         strip.grid_propagate(False)
-        strip.grid_columnconfigure((0, 1), weight=1)
+        strip.grid_columnconfigure((0, 1, 2), weight=1)
 
-        # 감정 요약
-        ef = ctk.CTkFrame(strip, fg_color="transparent")
-        ef.grid(row=0, column=0, padx=12, pady=4, sticky="w")
-        ctk.CTkLabel(ef, text="EMOTION", font=ctk.CTkFont(size=9), text_color=self._dim_color).pack(anchor="w")
-        self._emo_lbl = ctk.CTkLabel(ef, text="😐 Neutral",
+        # 운전자 상태 요약
+        sf = ctk.CTkFrame(strip, fg_color="transparent")
+        sf.grid(row=0, column=0, padx=12, pady=4, sticky="w")
+        ctk.CTkLabel(sf, text="DRIVER STATE", font=ctk.CTkFont(size=9), text_color=self._dim_color).pack(anchor="w")
+        self._state_lbl = ctk.CTkLabel(sf, text="😐 정상",
                                      font=ctk.CTkFont(size=16, weight="bold"), text_color=self._main_color)
-        self._emo_lbl.pack(anchor="w")
+        self._state_lbl.pack(anchor="w")
 
         # 피로도 (EAR) 요약
         rf = ctk.CTkFrame(strip, fg_color="transparent")
@@ -56,13 +56,27 @@ class DriverSeatFrame(ctk.CTkFrame):
         ctk.CTkLabel(rf, text="EAR (FATIGUE)", font=ctk.CTkFont(size=9), text_color=self._dim_color).pack(anchor="w")
         rr = ctk.CTkFrame(rf, fg_color="transparent")
         rr.pack(anchor="w")
-        self._ear_bar = ctk.CTkProgressBar(rr, width=100, height=10, progress_color="#2ecc71")
+        self._ear_bar = ctk.CTkProgressBar(rr, width=80, height=10, progress_color="#2ecc71")
         self._ear_bar.pack(side="left")
         self._ear_bar.set(0)
         self._ear_val = ctk.CTkLabel(rr, text="0.00",
                                      font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
                                      text_color=self._main_color)
         self._ear_val.pack(side="left", padx=(6, 0))
+
+        # 하품 (MAR) 요약
+        mf = ctk.CTkFrame(strip, fg_color="transparent")
+        mf.grid(row=0, column=2, padx=12, pady=4, sticky="w")
+        ctk.CTkLabel(mf, text="MAR (YAWN)", font=ctk.CTkFont(size=9), text_color=self._dim_color).pack(anchor="w")
+        mr = ctk.CTkFrame(mf, fg_color="transparent")
+        mr.pack(anchor="w")
+        self._mar_bar = ctk.CTkProgressBar(mr, width=80, height=10, progress_color="#2ecc71")
+        self._mar_bar.pack(side="left")
+        self._mar_bar.set(0)
+        self._mar_val = ctk.CTkLabel(mr, text="0.00",
+                                     font=ctk.CTkFont(family="Consolas", size=12, weight="bold"),
+                                     text_color=self._main_color)
+        self._mar_val.pack(side="left", padx=(6, 0))
 
         # 4. 제어 버튼
         bf = ctk.CTkFrame(self, fg_color="transparent")
@@ -95,6 +109,8 @@ class DriverSeatFrame(ctk.CTkFrame):
                 self._cam_sel.set(n)
                 break
 
+
+
     def update_camera_frame(self, frame_rgb):
         if frame_rgb is not None:
             lw, lh = self._cam_frame.winfo_width(), self._cam_frame.winfo_height()
@@ -108,11 +124,18 @@ class DriverSeatFrame(ctk.CTkFrame):
                 self._cam_label.configure(image=img, text="")
                 self._cam_label._ctk_image = img
 
-    def update_driver_state(self, emotion_text, ear_value):
-        self._emo_lbl.configure(text=emotion_text)
+    def update_driver_state(self, state_text, ear_value, mar_value):
+        self._state_lbl.configure(text=state_text)
+
+        # EAR 게이지
         self._ear_bar.set(min(ear_value / 0.4, 1.0))
         self._ear_val.configure(text=f"{ear_value:.2f}")
         self._ear_bar.configure(progress_color="#e74c3c" if (0 < ear_value < 0.22) else "#2ecc71")
+
+        # MAR 게이지
+        self._mar_bar.set(min(mar_value / 1.0, 1.0))
+        self._mar_val.configure(text=f"{mar_value:.2f}")
+        self._mar_bar.configure(progress_color="#e67e22" if mar_value > 0.50 else "#2ecc71")
 
     def set_button_states(self, start_state, pause_state, stop_state):
         self._btn_start.configure(state=start_state)
@@ -124,9 +147,12 @@ class DriverSeatFrame(ctk.CTkFrame):
 
     def reset_ui(self):
         self._cam_label.configure(image=None, text="카메라 대기 중\n\n▶ 시작 버튼을 누르세요")
-        self._emo_lbl.configure(text="😐 Neutral")
+        self._state_lbl.configure(text="😐 정상")
         self._ear_bar.set(0)
         self._ear_bar.configure(progress_color="#2ecc71")
         self._ear_val.configure(text="0.00")
+        self._mar_bar.set(0)
+        self._mar_bar.configure(progress_color="#2ecc71")
+        self._mar_val.configure(text="0.00")
         self.set_button_states("normal", "disabled", "disabled")
         self.set_start_button_text("▶ 시작")

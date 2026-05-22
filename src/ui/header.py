@@ -38,6 +38,8 @@ class HeaderFrame(ctk.CTkFrame):
                                            font=ctk.CTkFont(size=12))
         self._audio_switch.pack(side="left")
 
+
+
     def update_badge(self, is_auto):
         if is_auto:
             self._auto_badge.configure(text="● AI ACTIVE", text_color=self._accent)
