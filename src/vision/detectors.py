@@ -1,8 +1,3 @@
-"""
-detectors.py - 졸음 및 감정 분석 모듈 (AI)
-Python 3.14 호환을 위해 mediapipe.tasks API와 OpenCV DNN 모듈을 활용합니다.
-"""
-
 import os
 import logging
 
@@ -11,6 +6,8 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
+
+from .face_recognizer import download_model
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +23,22 @@ class DrowsinessDetector:
     _MOUTH = [78, 81, 311, 308, 402, 178]
 
     _MODEL_FILE = os.path.join(os.path.dirname(__file__), "face_landmarker.task")
+    _MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
 
     def __init__(self):
         self._detector = None
         self._load_model()
 
     def _load_model(self):
-        """로컬 Face Landmarker 모델 파일을 로드한다."""
+        """로컬 Face Landmarker 모델 파일을 로드한다. 파일이 없으면 다운로드한다."""
         if not os.path.exists(self._MODEL_FILE):
-            raise FileNotFoundError(
-                f"얼굴 랜드마크 모델 파일을 찾을 수 없습니다: {self._MODEL_FILE}"
-            )
+            try:
+                download_model(self._MODEL_URL, self._MODEL_FILE)
+            except Exception as e:
+                logger.error("얼굴 랜드마크 모델 다운로드 실패: %s", e)
+                raise FileNotFoundError(
+                    f"얼굴 랜드마크 모델 파일을 찾을 수 없고 다운로드에 실패했습니다: {self._MODEL_FILE}"
+                )
 
         try:
             with open(self._MODEL_FILE, 'rb') as f:
@@ -120,6 +122,7 @@ class EmotionDetector:
     """OpenCV DNN 모듈로 ONNX 모델을 로드하여 감정을 분석하는 클래스 (TensorFlow 미사용)."""
 
     _MODEL_FILE = os.path.join(os.path.dirname(__file__), "emotion_ferplus.onnx")
+    _MODEL_URL = "https://github.com/onnx/models/raw/main/validated/vision/body_analysis/emotion_ferplus/model/emotion-ferplus-8.onnx"
     
     # FER+ 감정 카테고리 매핑 (neutral, happiness, surprise, sadness, anger, disgust, fear, contempt)
     _EMOTIONS = ["neutral", "happy", "surprise", "sad", "angry", "disgust", "fear", "neutral"]
@@ -129,11 +132,15 @@ class EmotionDetector:
         self._load_model()
 
     def _load_model(self):
-        """로컬 ONNX 모델 파일을 로드한다."""
+        """로컬 ONNX 모델 파일을 로드한다. 파일이 없으면 다운로드한다."""
         if not os.path.exists(self._MODEL_FILE):
-            raise FileNotFoundError(
-                f"감정 인식 모델 파일을 찾을 수 없습니다: {self._MODEL_FILE}"
-            )
+            try:
+                download_model(self._MODEL_URL, self._MODEL_FILE)
+            except Exception as e:
+                logger.error("감정 인식 모델 다운로드 실패: %s", e)
+                raise FileNotFoundError(
+                    f"감정 인식 모델 파일을 찾을 수 없고 다운로드에 실패했습니다: {self._MODEL_FILE}"
+                )
 
         try:
             model_data = np.fromfile(self._MODEL_FILE, dtype=np.uint8)

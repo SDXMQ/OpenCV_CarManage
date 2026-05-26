@@ -180,6 +180,7 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# SEAVS Custom Sensitive Data & Large Models
 src/core/profiles.json
 settings.txt
 src/vision/*.onnx

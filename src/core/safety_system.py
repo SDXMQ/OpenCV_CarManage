@@ -61,8 +61,21 @@ class SafetyManager:
     def _load_profile(self, path, profile_name):
         default_data = {
             "name": "Default Profile", "base_ear": 0.28, "base_mar": 0.12,
-            "base_emotions": {"neutral": 0.0, "happy": 0.0, "surprise": 0.0, "sad": 0.0, "angry": 0.0, "disgust": 0.0, "fear": 0.0}
+            "base_emotions": {"neutral": 0.0, "happy": 0.0, "surprise": 0.0, "sad": 0.0, "angry": 0.0, "disgust": 0.0, "fear": 0.0},
+            "face_embedding": None
         }
+        
+        # 파일이 존재하지 않는 경우 기본 프로필 파일 자동 생성
+        if not os.path.exists(path):
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                initial_profiles = {"default": default_data}
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(initial_profiles, f, ensure_ascii=False, indent=4)
+                logger.info("기본 profiles.json 파일을 성공적으로 자동 생성했습니다: %s", path)
+            except Exception as create_err:
+                logger.error("기본 profiles.json 파일 자동 생성 중 오류 발생: %s", create_err)
+
         try:
             with open(path, "r", encoding="utf-8") as f:
                 profiles = json.load(f)
