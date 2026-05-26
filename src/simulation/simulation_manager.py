@@ -2,10 +2,13 @@
 simulation_manager.py - 시뮬레이션 제어 및 AI 연동 상태 관리자
 """
 
+import logging
 import threading
 import time
 import winsound
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 class SimulationManager:
     def __init__(self, config, safety, env, camera):
@@ -15,7 +18,7 @@ class SimulationManager:
         self._camera = camera
 
         self.sim_state = "stopped"
-        self._last_ai_log = ""
+        self._last_ai_key = None
 
         # 애니메이션용 목표값
         self.target_temp = self._env.ac_temp
@@ -45,7 +48,7 @@ class SimulationManager:
     def stop(self):
         self._camera.stop()
         self.sim_state = "stopped"
-        self._last_ai_log = ""
+        self._last_ai_key = None
         self.target_temp = self._env.ac_temp
         self.target_fan = self._env.ac_fan_speed
         return "⏹ 시스템 정지", "#e74c3c"
@@ -74,10 +77,11 @@ class SimulationManager:
             threading.Thread(target=lambda: winsound.Beep(1000, 300), daemon=True).start()
 
         # 4. AI 다감각 자동 제어 로직 적용
-        ai_log = None
-        ai_log_color = None
+        ai_state_key = None
+        ai_adjustments = None
+        ai_preset = None
         if auto_mode_active:
-            ai_log, ai_log_color = self._apply_auto(
+            ai_state_key, ai_adjustments, ai_preset = self._apply_auto(
                 is_drowsy, is_yawning, emotion
             )
             self._animate_sliders()
@@ -109,8 +113,9 @@ class SimulationManager:
             "is_drowsy": is_drowsy,
             "is_yawning": is_yawning,
             "safety_eval": safety_eval,
-            "ai_log": ai_log,
-            "ai_log_color": ai_log_color,
+            "ai_state_key": ai_state_key,
+            "ai_adjustments": ai_adjustments,
+            "ai_preset": ai_preset,
             "power_on": self._env.power_on,
             "ac_on": self._env.ac_on,
             "ac_temp": self._env.ac_temp,
@@ -163,12 +168,13 @@ class SimulationManager:
         self._env.seat_heater = preset.get("seat_heater", 0)
         self._env.haptic_vibration = preset.get("haptic_vibration", False)
 
-        # 로그 메시지가 변경된 경우에만 반환하여 기록하게 함
-        if self._last_ai_log != res["log"]:
-            self._last_ai_log = res["log"]
-            return res["log"], res["log_color"]
+        # 상태가 변경된 경우에만 반환하여 UI에서 로그를 기록하게 함
+        current_key = (res["state_key"], tuple(sorted(res["adjustments"])))
+        if self._last_ai_key != current_key:
+            self._last_ai_key = current_key
+            return res["state_key"], res["adjustments"], preset
 
-        return None, None
+        return None, None, None
 
     def _simulate_co2(self):
         """내기/외기 순환 및 창문 상태에 따른 CO2 농도 변화 시뮬레이션."""

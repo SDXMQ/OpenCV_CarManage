@@ -2,10 +2,12 @@
 main.py - SEAVS 차량 콕핏 대시보드
 """
 
+import logging
+import os
 import customtkinter as ctk
 
 from core.config_manager import ConfigManager
-from core.safety_system import SafetyManager
+from core.safety_system import SafetyManager, SafetyState
 from core.vehicle_env import VehicleEnvironment
 from vision.camera import VideoCamera
 from simulation.simulation_manager import SimulationManager
@@ -15,6 +17,18 @@ from ui.header import HeaderFrame
 from ui.driver_seat import DriverSeatFrame
 from ui.center_display import CenterDisplayFrame
 from ui.ac_panel import AcPanelFrame
+
+# 로깅 초기화 (콘솔 + 파일)
+_LOG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "seavs.log")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(_LOG_FILE, encoding="utf-8"),
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 class App(ctk.CTk):
@@ -27,14 +41,65 @@ class App(ctk.CTk):
     _DIM = "#5f6f81"
     _MAIN = "#ecf0f1"
 
-    # 운전자 상태 → 표시 텍스트 매핑
-    _STATE_LABELS = {
-        "danger": "🚨 졸음 위험",
-        "warning": "🥱 하품 감지",
-        "glare": "☀ 눈부심 피로",
-        "stress": "😤 스트레스/피로",
-        "low_engagement": "😶 집중력 저하",
-        "normal": "😐 정상",
+    # SafetyState → UI 표시 정보 매핑
+    _STATE_UI_INFO = {
+        SafetyState.DANGER: {
+            "label": "🚨 졸음 위험",
+            "message": "⚠ 졸음 감지! 즉시 주의하십시오!",
+            "color": "#e74c3c",
+        },
+        SafetyState.WARNING: {
+            "label": "🥱 하품 감지",
+            "message": "🥱 하품 감지 → 졸음 전조 증상",
+            "color": "#e67e22",
+        },
+        SafetyState.GLARE: {
+            "label": "☀ 눈부심 피로",
+            "message": "☀ 눈부심이 감지되었습니다. 선바이저를 내릴까요?",
+            "color": "#f39c12",
+        },
+        SafetyState.STRESS: {
+            "label": "😤 스트레스/피로",
+            "message": "😤 스트레스/피로도 누적 감지",
+            "color": "#e67e22",
+        },
+        SafetyState.LOW_ENGAGEMENT: {
+            "label": "😶 집중력 저하",
+            "message": "😶 집중력 저하 상태 감지",
+            "color": "#9b59b6",
+        },
+        SafetyState.NORMAL: {
+            "label": "😐 정상",
+            "message": "",
+            "color": "#3498db",
+        },
+    }
+
+    # AI 자동제어 로그 템플릿 (state_key → 포맷 문자열)
+    _AUTO_LOG_TEMPLATES = {
+        "danger": "😪 졸음 감지 → 쿨링 펀치({ac_temp}°C/{ac_fan_speed}단), 외기유입, 창문 틸팅, 직바람, {audio_genre} {audio_volume}%, 시트 통풍 {seat_ventilation}단, 햅틱 진동 ON",
+        "warning": "🥱 하품 감지 → 냉각 강화({ac_temp}°C/{ac_fan_speed}단), 외기유입, 직바람, {audio_genre} {audio_volume}%, 시트 통풍 {seat_ventilation}단",
+        "stress": "😤 스트레스 감지 → {ac_temp}°C 외기 간접풍, 앰버 무드등, {audio_genre} {audio_volume}%, 시트 통풍 {seat_ventilation}단",
+        "low_engagement": "😶 집중력 저하 → {ac_temp}°C 외기 간접풍, 그린 무드등, {audio_genre} {audio_volume}%, 시트 열선 {seat_heater}단",
+        "happy": "😊 쾌적 → {ac_temp}°C 표준 유지, 그린 무드등",
+        "normal": "😐 평온 → {ac_temp}°C 표준 유지",
+    }
+
+    _AUTO_LOG_COLORS = {
+        "danger": "#e74c3c",
+        "warning": "#e67e22",
+        "stress": "#e67e22",
+        "low_engagement": "#9b59b6",
+        "happy": "#2ecc71",
+        "normal": "#3498db",
+    }
+
+    _ADJUSTMENT_LABELS = {
+        "glare": "☀눈부심 차광 제어(다크 40%, 앰버 무드등)",
+        "tunnel": "🌑터널 자동 감광/내기순환",
+        "co2_window": "💨이산화탄소 환기(외기유입+창문 개방)",
+        "co2_external": "💨이산화탄소 환기(외기유입 강제)",
+        "high_speed_window": "🚗고속 안전 제어(창문 닫힘)",
     }
 
     def __init__(self):
@@ -280,7 +345,7 @@ class App(ctk.CTk):
     def _on_camera_change(self, sel):
         try:
             idx = int(sel.split(":")[0])
-        except Exception:
+        except (ValueError, IndexError):
             idx = 0
         self._camera.change_device(idx)
         self._config.set_and_save("camera_index", idx)
@@ -366,13 +431,24 @@ class App(ctk.CTk):
 
         # 2. 운전자 상태 텍스트 매핑
         safety = data["safety_eval"]
-        state_key = safety["state"]
-        state_str = self._STATE_LABELS.get(state_key, "😐 정상")
+        state = safety["state"]  # SafetyState enum
+        ui_info = self._STATE_UI_INFO[state]
+
+        # happy 감정일 때는 별도 UI 표시
+        emo = data["emotion"]
+        dominant = emo.get("dominant", "neutral")
+        if state == SafetyState.NORMAL and dominant == "happy":
+            state_str = "😊 쾌적"
+            alert_msg = "😊 쾌적한 주행 중"
+            alert_color = "#2ecc71"
+        else:
+            state_str = ui_info["label"]
+            alert_msg = ui_info["message"]
+            alert_color = ui_info["color"]
 
         self._driver_seat.update_driver_state(state_str, data["ear_value"], data["mar_value"])
 
         # 3. 상세 감정 확률 텍스트 갱신
-        emo = data["emotion"]
         scores = emo.get("scores", {})
         top_scores_text = ""
         if scores:
@@ -381,15 +457,21 @@ class App(ctk.CTk):
         self._center_disp.update_state_display(state_str, top_scores_text)
 
         # 4. 경고 배너 갱신
-        self._center_disp.update_alert(safety["message"], safety["color"])
+        self._center_disp.update_alert(alert_msg, alert_color)
 
         # 5. CO2 물리 시뮬레이션 UI 동기화
         self._center_disp.update_env_display(data["co2_level"])
 
         # 6. AI 연동 에어컨 상태 UI 동기화
         if self._auto_mode_var.get():
-            if data["ai_log"]:
-                self._write_log(data["ai_log"], data["ai_log_color"])
+            if data["ai_state_key"]:
+                log_text = self._build_auto_log(
+                    data["ai_state_key"], data["ai_adjustments"], data["ai_preset"]
+                )
+                log_color = self._get_auto_log_color(
+                    data["ai_state_key"], data["ai_adjustments"]
+                )
+                self._write_log(log_text, log_color)
 
             self._power_var.set(data["power_on"])
             self._ac_var.set(data["ac_on"])
@@ -425,8 +507,32 @@ class App(ctk.CTk):
         try:
             from pygrabber.dshow_graph import FilterGraph
             return {i: n for i, n in enumerate(FilterGraph().get_input_devices())}
-        except Exception:
+        except ImportError:
+            logger.info("pygrabber 미설치 - 기본 카메라 사용")
             return {0: "기본 카메라"}
+        except RuntimeError as e:
+            logger.warning("카메라 장치 조회 실패: %s", e)
+            return {0: "기본 카메라"}
+
+    # ═══════════════════════════════════════
+    # AI 자동제어 로그 빌더 (UI 레이어)
+    # ═══════════════════════════════════════
+
+    def _build_auto_log(self, state_key, adjustments, preset):
+        """AI 자동제어 상태 변경 시 UI 로그 문자열을 조립한다."""
+        template = self._AUTO_LOG_TEMPLATES.get(state_key, "")
+        log = template.format(**preset)
+        if adjustments:
+            adj_labels = [self._ADJUSTMENT_LABELS.get(a, a) for a in adjustments]
+            log += " + [" + ", ".join(adj_labels) + "]"
+        return log
+
+    def _get_auto_log_color(self, state_key, adjustments):
+        """상태와 보정 조건에 따라 로그 색상을 결정한다."""
+        base_color = self._AUTO_LOG_COLORS.get(state_key, "#3498db")
+        if adjustments and base_color not in ("#e74c3c", "#e67e22"):
+            return "#f39c12"
+        return base_color
 
     def _on_close(self):
         self._sim.stop()
