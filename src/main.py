@@ -11,12 +11,14 @@ from core.safety_system import SafetyManager, SafetyState
 from core.vehicle_env import VehicleEnvironment
 from vision.camera import VideoCamera
 from simulation.simulation_manager import SimulationManager
+from core.i18n import t, set_language
 
 # UI 컴포넌트 임포트
 from ui.header import HeaderFrame
 from ui.driver_seat import DriverSeatFrame
 from ui.center_display import CenterDisplayFrame
 from ui.ac_panel import AcPanelFrame
+from ui.settings_window import SettingsWindow
 
 # 로깅 초기화 (콘솔 + 파일)
 _LOG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "seavs.log")
@@ -41,39 +43,15 @@ class App(ctk.CTk):
     _DIM = "#5f6f81"
     _MAIN = "#ecf0f1"
 
-    # SafetyState → UI 표시 정보 매핑
-    _STATE_UI_INFO = {
-        SafetyState.DANGER: {
-            "label": "🚨 졸음 위험",
-            "message": "⚠ 졸음 감지! 즉시 주의하십시오!",
-            "color": "#e74c3c",
-        },
-        SafetyState.WARNING: {
-            "label": "🥱 하품 감지",
-            "message": "🥱 하품 감지 → 졸음 전조 증상",
-            "color": "#e67e22",
-        },
-        SafetyState.GLARE: {
-            "label": "☀ 눈부심 피로",
-            "message": "☀ 눈부심이 감지되었습니다. 선바이저를 내릴까요?",
-            "color": "#f39c12",
-        },
-        SafetyState.STRESS: {
-            "label": "😤 스트레스/피로",
-            "message": "😤 스트레스/피로도 누적 감지",
-            "color": "#e67e22",
-        },
-        SafetyState.LOW_ENGAGEMENT: {
-            "label": "😶 집중력 저하",
-            "message": "😶 집중력 저하 상태 감지",
-            "color": "#9b59b6",
-        },
-        SafetyState.NORMAL: {
-            "label": "😐 정상",
-            "message": "",
-            "color": "#3498db",
-        },
-    }
+    def _get_state_ui_info(self):
+        return {
+            SafetyState.DANGER: {"label": t("state_danger"), "message": t("msg_danger"), "color": "#e74c3c"},
+            SafetyState.WARNING: {"label": t("state_warning"), "message": t("msg_warning"), "color": "#e67e22"},
+            SafetyState.GLARE: {"label": t("state_glare"), "message": t("msg_glare"), "color": "#f39c12"},
+            SafetyState.STRESS: {"label": t("state_stress"), "message": t("msg_stress"), "color": "#e67e22"},
+            SafetyState.LOW_ENGAGEMENT: {"label": t("state_low_eng"), "message": t("msg_low_eng"), "color": "#9b59b6"},
+            SafetyState.NORMAL: {"label": t("state_normal"), "message": t("msg_normal"), "color": "#3498db"},
+        }
 
     # AI 자동제어 로그 템플릿 (state_key → 포맷 문자열)
     _AUTO_LOG_TEMPLATES = {
@@ -110,11 +88,23 @@ class App(ctk.CTk):
         self.configure(fg_color=self._BG)
         ctk.set_appearance_mode("dark")
 
-        # 1. 코어 매니저 초기화
+        # 1. 코어 매니저 초기화 및 설정 적용
         self._config = ConfigManager()
-        self._safety = SafetyManager()
+        set_language(self._config.get("language", "ko"))
+        
+        self.title(t("title"))
+        
+        # 프로필 로드 설정
+        current_prof = self._config.get("current_profile", "default")
+        self._safety = SafetyManager(current_profile=current_prof)
         self._env = VehicleEnvironment()
-        self._camera = VideoCamera(device_index=self._config.get("camera_index", 0))
+        self._camera = VideoCamera(
+            device_index=self._config.get("camera_index", 0),
+            mirror_camera=self._config.get("mirror_camera", False)
+        )
+        # 카메라에 초기 프로필 데이터 주입
+        self._camera.set_active_profile(self._safety.active_profile_data)
+        
         self._sim = SimulationManager(self._config, self._safety, self._env, self._camera)
 
         # 2. UI 변수 바인딩
@@ -142,6 +132,7 @@ class App(ctk.CTk):
             audio_enabled_var=self._audio_enabled,
             on_auto_toggle=self._on_auto_toggle,
             on_audio_toggle=self._on_audio_toggle,
+            on_settings_click=self._on_settings_click,
             accent_color=self._ACCENT
         )
         self._header.pack(fill="x")
@@ -222,6 +213,26 @@ class App(ctk.CTk):
     # ═══════════════════════════════════════
     # 에어컨/헤더 조작 콜백
     # ═══════════════════════════════════════
+
+    def _on_settings_click(self):
+        # 모달창 열기
+        SettingsWindow(self, self._config, self._camera, self._safety, self._on_settings_saved)
+
+    def _on_settings_saved(self):
+        # 설정창에서 저장이 완료되었을 때 호출 (다국어 등 갱신)
+        self.title(t("title"))
+        # 모든 정적 UI 업데이트
+        self._header._settings_btn.configure(text=t("btn_settings"))
+        self._driver_seat._start_btn.configure(text=t("btn_start"))
+        self._driver_seat._pause_btn.configure(text=t("btn_pause"))
+        self._driver_seat._stop_btn.configure(text=t("btn_stop"))
+        
+        # 재렌더링 시 현재 상태 UI 강제 갱신
+        self._refresh_static_texts()
+
+    def _refresh_static_texts(self):
+        # 헤더 등은 동적 렌더링되지만 고정 라벨들은 여기서 갱신해준다
+        pass # 전체 프레임을 다 뜯어고치기보단 최소한의 갱신만 수행
 
     def _on_power_toggle(self):
         self._env.power_on = self._power_var.get()
@@ -432,7 +443,7 @@ class App(ctk.CTk):
         # 2. 운전자 상태 텍스트 매핑
         safety = data["safety_eval"]
         state = safety["state"]  # SafetyState enum
-        ui_info = self._STATE_UI_INFO[state]
+        ui_info = self._get_state_ui_info()[state]
 
         # happy 감정일 때는 별도 UI 표시
         emo = data["emotion"]

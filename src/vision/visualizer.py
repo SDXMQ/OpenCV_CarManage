@@ -7,8 +7,20 @@ class FrameVisualizer:
     """분석된 EAR, MAR 및 감정 데이터를 원본 OpenCV 프레임 위에 그리는 유틸리티."""
 
     @staticmethod
-    def draw_overlays(frame, ear_value, mar_value, emotion_data, is_drowsy, is_yawning):
-        """프레임에 각종 정보와 경고를 그린다 (In-place 연산)."""
+    def draw_overlays(frame, ear_value, mar_value, emotion_data, is_drowsy, is_yawning, all_bboxes=None, target_bbox=None):
+        """프레임에 각종 정보와 경고 및 검출된 얼굴 사각형을 그린다 (In-place 연산)."""
+        
+        # 다중 얼굴 바운딩 박스 시각화
+        if all_bboxes:
+            for bbox in all_bboxes:
+                xmin, ymin, xmax, ymax = bbox
+                # 타겟 운전자(현재 추적 대상)는 초록색, 그 외 인물은 회색 표시
+                if target_bbox is not None and bbox == target_bbox:
+                    cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+                    cv2.putText(frame, "DRIVER", (xmin, max(ymin - 10, 15)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                else:
+                    cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (120, 120, 120), 1)
         
         # EAR 오버레이
         cv2.putText(frame, f"EAR: {ear_value:.2f}", (10, 30),

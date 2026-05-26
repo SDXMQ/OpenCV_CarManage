@@ -3,9 +3,10 @@ header.py - 상단 헤더 UI 컴포넌트
 """
 
 import customtkinter as ctk
+from core.i18n import t
 
 class HeaderFrame(ctk.CTkFrame):
-    def __init__(self, master, auto_mode_var, audio_enabled_var, on_auto_toggle, on_audio_toggle, accent_color="#00d2ff"):
+    def __init__(self, master, auto_mode_var, audio_enabled_var, on_auto_toggle, on_audio_toggle, on_settings_click=None, accent_color="#00d2ff"):
         super().__init__(master, height=46, corner_radius=0, fg_color="#080812")
         self.pack_propagate(False)
         self._accent = accent_color
@@ -36,9 +37,12 @@ class HeaderFrame(ctk.CTkFrame):
         self._audio_switch = ctk.CTkSwitch(right, text="🔊", variable=audio_enabled_var,
                                            command=on_audio_toggle, width=40,
                                            font=ctk.CTkFont(size=12))
-        self._audio_switch.pack(side="left")
-
-
+        self._audio_switch.pack(side="left", padx=(0, 15))
+        
+        # 설정 버튼
+        self._settings_btn = ctk.CTkButton(right, text=t("btn_settings"), width=60, height=28,
+                                           command=on_settings_click, fg_color="#34495e", hover_color="#2c3e50")
+        self._settings_btn.pack(side="left")
 
     def update_badge(self, is_auto):
         if is_auto:

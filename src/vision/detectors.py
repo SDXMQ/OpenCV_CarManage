@@ -46,34 +46,51 @@ class DrowsinessDetector:
                 base_options=base_options,
                 output_face_blendshapes=False,
                 output_facial_transformation_matrixes=False,
-                num_faces=1
+                num_faces=4  # 최대 4개 얼굴 검출 허용
             )
             self._detector = vision.FaceLandmarker.create_from_options(options)
-            logger.info("MediaPipe Tasks 얼굴 분석 엔진 활성화 완료.")
+            logger.info("MediaPipe Tasks 얼굴 분석 엔진 활성화 완료 (최대 4인).")
         except (OSError, RuntimeError) as e:
             logger.error("MediaPipe 얼굴 분석 엔진 초기화 실패: %s", e)
 
     def process(self, frame_rgb):
-        """RGB 프레임을 입력받아 (EAR, MAR, landmarks)를 반환한다."""
-        if self._detector is None:
-            return 0.0, 0.0, None
+        """RGB 프레임을 입력받아 단일(첫 번째) 얼굴의 (EAR, MAR, landmarks)를 반환한다 (하위 호환용)."""
+        multi_results = self.process_multi(frame_rgb)
+        if multi_results:
+            ear, mar, landmarks, _ = multi_results[0]
+            return ear, mar, landmarks
+        return 0.0, 0.0, None
 
-        # mp.Image 형식으로 변환
+    def process_multi(self, frame_rgb):
+        """RGB 프레임을 입력받아 감지된 모든 얼굴의 [(ear, mar, landmarks, bbox), ...] 리스트를 반환한다."""
+        if self._detector is None:
+            return []
+
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+        results = []
         
         try:
             detection_result = self._detector.detect(mp_image)
             
             if detection_result.face_landmarks:
-                landmarks = detection_result.face_landmarks[0]
                 h, w = frame_rgb.shape[:2]
-                ear = self._compute_ear(landmarks, w, h)
-                mar = self._compute_mar(landmarks, w, h)
-                return ear, mar, landmarks
+                for landmarks in detection_result.face_landmarks:
+                    ear = self._compute_ear(landmarks, w, h)
+                    mar = self._compute_mar(landmarks, w, h)
+                    
+                    # 랜드마크로부터 바운딩 박스(xmin, ymin, xmax, ymax) 추출
+                    x_coords = [lm.x * w for lm in landmarks]
+                    y_coords = [lm.y * h for lm in landmarks]
+                    
+                    xmin, xmax = max(0, int(min(x_coords))), min(w, int(max(x_coords)))
+                    ymin, ymax = max(0, int(min(y_coords))), min(h, int(max(y_coords)))
+                    
+                    bbox = (xmin, ymin, xmax, ymax)
+                    results.append((ear, mar, landmarks, bbox))
         except (RuntimeError, ValueError) as e:
-            logger.warning("얼굴 랜드마크 검출 중 오류 발생: %s", e)
+            logger.warning("다중 얼굴 랜드마크 검출 중 오류 발생: %s", e)
             
-        return 0.0, 0.0, None
+        return results
 
     def _compute_ear(self, landmarks, w, h):
         left_ear = self._aspect_ratio(landmarks, self._LEFT_EYE, w, h)

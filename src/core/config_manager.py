@@ -12,7 +12,10 @@ class ConfigManager:
         self.filepath = filepath
         self.config = {
             "camera_index": 0,
-            "audio_alert": False
+            "audio_alert": False,
+            "language": "ko",
+            "mirror_camera": False,
+            "current_profile": "default"
         }
         self.load()
 
@@ -36,6 +39,12 @@ class ConfigManager:
                         self.config[key] = int(val) if val.isdigit() else 0
                     elif key == "audio_alert":
                         self.config[key] = (val.lower() == "true")
+                    elif key == "mirror_camera":
+                        self.config[key] = (val.lower() == "true")
+                    elif key == "language":
+                        self.config[key] = val
+                    elif key == "current_profile":
+                        self.config[key] = val
 
     def save_all(self):
         """현재 메모리의 설정값을 파일에 쓴다."""

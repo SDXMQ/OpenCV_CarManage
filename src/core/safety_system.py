@@ -25,12 +25,15 @@ class SafetyState(Enum):
 class SafetyManager:
 
     _RULES_FILE = os.path.join(os.path.dirname(__file__), "rules.json")
+    _PROFILES_FILE = os.path.join(os.path.dirname(__file__), "profiles.json")
 
-    def __init__(self, rules_path=None):
+    def __init__(self, rules_path=None, profiles_path=None, current_profile="default"):
         self.current_state = SafetyState.NORMAL
         self.should_beep = False
         self.co2_vent_active = False
         self._rules = self._load_rules(rules_path or self._RULES_FILE)
+        
+        self.active_profile_data = self._load_profile(profiles_path or self._PROFILES_FILE, current_profile)
         
         # Leaky Bucket 상태 감쇠 점수 관리
         self._state_scores = {
@@ -55,10 +58,42 @@ class SafetyManager:
             logger.error("제어 규칙 파일 파싱 실패: %s", e)
             raise
 
+    def _load_profile(self, path, profile_name):
+        default_data = {
+            "name": "Default Profile", "base_ear": 0.28, "base_mar": 0.12,
+            "base_emotions": {"neutral": 0.0, "happy": 0.0, "surprise": 0.0, "sad": 0.0, "angry": 0.0, "disgust": 0.0, "fear": 0.0}
+        }
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                profiles = json.load(f)
+                return profiles.get(profile_name, default_data)
+        except Exception as e:
+            logger.warning("프로필 로드 실패, 기본값 사용: %s", e)
+            return default_data
+
+    def set_active_profile(self, profile_name, profiles_path=None):
+        self.active_profile_data = self._load_profile(profiles_path or self._PROFILES_FILE, profile_name)
+
     def evaluate(self, is_drowsy, is_yawning, emotion, sunlight_glare=False):
-        """운전자 상태를 평가하고 SafetyState를 반환하며 Leaky Bucket 감쇠 로직을 적용한다."""
+        """운전자 상태를 평가하고 SafetyState를 반환하며 Leaky Bucket 감쇠 및 프로필 보정 로직을 적용한다."""
         self.should_beep = False
-        dominant = emotion.get("dominant", "neutral")
+        
+        # 0. 프로필 오프셋을 통한 감정 보정(Calibration) 연산
+        base_emotions = self.active_profile_data.get("base_emotions", {})
+        scores = emotion.get("scores", {})
+        corrected_scores = {}
+        
+        for emo, score in scores.items():
+            base_score = base_emotions.get(emo, 0.0)
+            corrected_scores[emo] = max(0.0, score - base_score)
+        
+        # 보정된 점수로 지배적 감정(Dominant) 재산출
+        if corrected_scores:
+            dominant = max(corrected_scores, key=corrected_scores.get)
+            if corrected_scores[dominant] < 10.0:  # 모든 점수가 매우 낮으면
+                dominant = "neutral"
+        else:
+            dominant = emotion.get("dominant", "neutral")
 
         # 1. 현재 프레임의 원시 상태 판정
         if is_drowsy:
