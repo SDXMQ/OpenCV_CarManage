@@ -122,6 +122,13 @@
         "co2_vent_on": 1800.0,
         "co2_vent_off": 1000.0,
         "high_speed": 100.0,
-        "min_fan_speed_high_speed": 3
+        "min_fan_speed_high_speed": 3,
+        "state_decay_rates": {
+            "danger": 0.01,
+            "warning": 0.02,
+            "glare": 0.02,
+            "stress": 0.02,
+            "low_engagement": 0.02
+        }
     }
 }

@@ -81,9 +81,7 @@ class SimulationManager:
         ai_adjustments = None
         ai_preset = None
         if auto_mode_active:
-            ai_state_key, ai_adjustments, ai_preset = self._apply_auto(
-                is_drowsy, is_yawning, emotion
-            )
+            ai_state_key, ai_adjustments, ai_preset = self._apply_auto(emotion)
             self._animate_sliders()
 
         # 5. CO2 물리 시뮬레이션
@@ -138,10 +136,10 @@ class SimulationManager:
         }
 
 
-    def _apply_auto(self, is_drowsy, is_yawning, emotion):
+    def _apply_auto(self, emotion):
         """AI 분석 결과를 가져와서 다감각 차량 목표 상태값을 갱신한다."""
         res = self._safety.get_auto_environment(
-            is_drowsy, is_yawning, emotion,
+            emotion,
             sunlight_glare=self._env.sunlight_glare,
             tunnel_entry=self._env.tunnel_entry,
             co2_level=self._env.co2_level,
