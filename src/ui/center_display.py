@@ -10,7 +10,7 @@ class CenterDisplayFrame(ctk.CTkFrame):
                  dim_color="#5f6f81", main_color="#ecf0f1",
                  glare_var=None, tunnel_var=None, co2_var=None, speed_var=None,
                  on_glare_toggle=None, on_tunnel_toggle=None,
-                 on_co2_change=None, on_speed_change=None):
+                 on_co2_change=None, on_speed_change=None, on_charge_click=None):
         super().__init__(master, corner_radius=14, fg_color=panel_color, border_width=1, border_color="#22223b")
         
         self._screen_color = screen_color
@@ -21,7 +21,8 @@ class CenterDisplayFrame(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=1)
-        self.grid_rowconfigure(3, weight=2)
+        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(4, weight=2)
 
         # 1. 타이틀
         tf = ctk.CTkFrame(self, fg_color="#0d0d18", height=34, corner_radius=0)
@@ -113,9 +114,37 @@ class CenterDisplayFrame(ctk.CTkFrame):
 
 
 
-        # 4. AI 시스템 로그 창
+        # 4. 배터리 및 최적화 상태 (BATTERY & OPTIMIZER STATUS)
+        bat_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
+        bat_f.grid(row=3, column=0, sticky="nsew", padx=10, pady=(4, 4))
+        bat_f.grid_columnconfigure(0, weight=1)
+        bat_f.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(bat_f, text="🔋 BATTERY & OPTIMIZER",
+                     font=ctk.CTkFont(family="Consolas", size=10),
+                     text_color=self._accent).grid(row=0, column=0, columnspan=2, padx=15, pady=(8, 4), sticky="w")
+                     
+        soc_frame = ctk.CTkFrame(bat_f, fg_color="transparent")
+        soc_frame.grid(row=1, column=0, padx=15, sticky="w", pady=(0, 8))
+        self._soc_bar = ctk.CTkProgressBar(soc_frame, width=150, height=12, progress_color="#2ecc71")
+        self._soc_bar.set(1.0)
+        self._soc_bar.pack(side="left", padx=(0, 10))
+        self._soc_lbl = ctk.CTkLabel(soc_frame, text="100.0%", font=ctk.CTkFont(size=12, weight="bold"))
+        self._soc_lbl.pack(side="left")
+
+        self._power_lbl = ctk.CTkLabel(bat_f, text="Draw: 0.00 kW", font=ctk.CTkFont(size=11), text_color=self._dim_color)
+        self._power_lbl.grid(row=2, column=0, padx=15, sticky="w", pady=(0, 8))
+
+        self._charge_btn = ctk.CTkButton(bat_f, text="⚡ 급속 충전", width=80, height=24, font=ctk.CTkFont(size=11, weight="bold"),
+                                         fg_color="#e67e22", hover_color="#d35400", command=on_charge_click)
+        self._charge_btn.grid(row=1, column=1, padx=15, sticky="e")
+
+        self._opt_lbl = ctk.CTkLabel(bat_f, text="Opt: Standby", font=ctk.CTkFont(family="Consolas", size=10), text_color="#f39c12")
+        self._opt_lbl.grid(row=2, column=1, padx=15, sticky="e", pady=(0, 8))
+
+        # 5. AI 시스템 로그 창
         log_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
-        log_f.grid(row=3, column=0, sticky="nsew", padx=10, pady=(4, 10))
+        log_f.grid(row=4, column=0, sticky="nsew", padx=10, pady=(4, 10))
         log_f.grid_columnconfigure(0, weight=1)
         log_f.grid_rowconfigure(1, weight=1)
 
@@ -163,6 +192,20 @@ class CenterDisplayFrame(ctk.CTkFrame):
         self._log.tag_config(tag, foreground=color)
         self._log.see("end")
         self._log.configure(state="disabled")
+
+    def update_battery_status(self, soc, power_draw, solver_active, weights):
+        self._soc_bar.set(soc / 100.0)
+        self._soc_lbl.configure(text=f"{soc:.1f}%")
+        
+        soc_color = "#e74c3c" if soc < 20 else "#f39c12" if soc < 50 else "#2ecc71"
+        self._soc_bar.configure(progress_color=soc_color)
+        
+        self._power_lbl.configure(text=f"Draw: {power_draw:.2f} kW")
+        
+        if solver_active:
+            self._opt_lbl.configure(text=f"Opt Active (w1={weights[0]:.2f}, w2={weights[1]:.2f})")
+        else:
+            self._opt_lbl.configure(text="Opt: Standby")
 
     def reset_ui(self):
         self._state_main.configure(text="😐 정상")

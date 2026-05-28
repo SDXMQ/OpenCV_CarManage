@@ -22,6 +22,11 @@ class VehicleEnvironment:
         self.tunnel_entry = False         # 터널/야간 진입 여부
         self.speed = 80.0                 # 주행 속도 (km/h)
 
+        # === 배터리 및 전력 소비 상태 ===
+        self.soc = 100.0                  # 배터리 잔량 (State of Charge, %)
+        self.battery_capacity = 77.4      # 총 배터리 용량 (kWh)
+        self.ac_power_draw = 0.0          # 실시간 공조 전력 소비율 (kW)
+
         # === 다감각 차량 제어기 출력 상태 ===
         self.ventilation_mode = "internal"    # "internal"(내기순환) / "external"(외기유입)
         self.window_tilting = False           # 창문/선루프 틸팅 개방

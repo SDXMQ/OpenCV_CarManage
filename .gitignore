@@ -185,3 +185,5 @@ src/core/profiles.json
 settings.txt
 src/vision/*.onnx
 src/vision/*.task
+
+desktop.ini

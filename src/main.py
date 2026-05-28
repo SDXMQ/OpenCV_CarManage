@@ -177,6 +177,7 @@ class App(ctk.CTk):
             on_tunnel_toggle=self._on_tunnel_toggle,
             on_co2_change=self._on_co2_change,
             on_speed_change=self._on_speed_change,
+            on_charge_click=self._on_charge_click,
         )
         self._center_disp.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
@@ -381,6 +382,10 @@ class App(ctk.CTk):
         self._env.speed = val
         self._center_disp.update_speed_label(val)
 
+    def _on_charge_click(self):
+        self._env.soc = 100.0
+        self._write_log("⚡ 배터리 급속 충전 완료 (100%)", "#f39c12")
+
     # ═══════════════════════════════════════
     # 시뮬레이션 라이프사이클 제어
     # ═══════════════════════════════════════
@@ -472,6 +477,14 @@ class App(ctk.CTk):
 
         # 5. CO2 물리 시뮬레이션 UI 동기화
         self._center_disp.update_env_display(data["co2_level"])
+
+        # 배터리 및 최적화 상태 UI 동기화
+        self._center_disp.update_battery_status(
+            soc=data.get("soc", 100.0),
+            power_draw=data.get("ac_power_draw", 0.0),
+            solver_active=data.get("solver_active", False),
+            weights=data.get("solver_weights", (0.5, 0.5))
+        )
 
         # 6. AI 연동 에어컨 상태 UI 동기화
         if self._auto_mode_var.get():

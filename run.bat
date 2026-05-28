@@ -9,5 +9,5 @@ call .\venv\Scripts\activate.bat
 pip install -r requirements.txt --quiet
 
 set PYTHONPATH=%~dp0
-cd src
-python main.py
+start "" python src\main.py
+start "" python fleet_monitor.py

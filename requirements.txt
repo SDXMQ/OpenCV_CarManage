@@ -4,3 +4,4 @@ opencv-python
 mediapipe
 paho-mqtt
 pygrabber
+python-can
