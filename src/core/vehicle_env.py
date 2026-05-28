@@ -24,7 +24,7 @@ class VehicleEnvironment:
 
         # === 배터리 및 전력 소비 상태 ===
         self.soc = 100.0                  # 배터리 잔량 (State of Charge, %)
-        self.battery_capacity = 77.4      # 총 배터리 용량 (kWh)
+        self.battery_capacity = 20.0      # 총 배터리 용량 (kWh, 빠른 테스트를 위해 축소)
         self.ac_power_draw = 0.0          # 실시간 공조 전력 소비율 (kW)
 
         # === 다감각 차량 제어기 출력 상태 ===

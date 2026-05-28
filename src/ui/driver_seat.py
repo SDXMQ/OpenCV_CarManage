@@ -99,13 +99,14 @@ class DriverSeatFrame(ctk.CTkFrame):
         self._btn_stop.grid(row=0, column=2, padx=3)
 
         # 5. 카메라 선택 옵션 메뉴
-        names = [f"{i}: {n}" for i, n in camera_devices.items()] or ["0: 기본 카메라"]
+        names = [f"{k}: {v}" for k, v in camera_devices.items()] if camera_devices else ["0: 기본 카메라"]
         self._cam_sel = ctk.CTkOptionMenu(self, values=names, command=on_camera_change,
                                           width=200, font=ctk.CTkFont(size=10), fg_color="#1a1a2e")
         self._cam_sel.grid(row=4, column=0, pady=(0, 10))
         
+        idx_str = str(current_camera_index)
         for n in names:
-            if n.startswith(str(current_camera_index) + ":"):
+            if n.startswith(idx_str + ":"):
                 self._cam_sel.set(n)
                 break
 

@@ -5,3 +5,7 @@ mediapipe
 paho-mqtt
 pygrabber
 python-can
+Flask
+qrcode
+pyngrok
+python-dotenv

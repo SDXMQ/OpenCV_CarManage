@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEAVS Mobile Camera</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        video {
+            width: 100%;
+            max-height: 80vh;
+            object-fit: cover;
+            transform: scaleX(-1); /* 기본 전면카메라 미러링 효과 제거 */
+        }
+        #controls {
+            margin-top: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #00d2ff;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        #status {
+            margin-top: 10px;
+            color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+
+    <h2 id="title">카메라 연결 대기중</h2>
+    <video id="video" autoplay playsinline></video>
+    <!-- 숨겨진 캔버스 (크기 조절 및 전송용) -->
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div id="controls">
+        <button id="startBtn">카메라 켜기</button>
+    </div>
+    <div id="status"></div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const statusDiv = document.getElementById('status');
+        const title = document.getElementById('title');
+
+        let isStreaming = false;
+
+        async function startCamera() {
+            try {
+                // 후면 카메라 우선 사용
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } } 
+                });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // 후면 카메라일 경우 좌우반전 원복
+                    const track = stream.getVideoTracks()[0];
+                    if (track.getSettings().facingMode === "environment") {
+                        video.style.transform = "scaleX(1)";
+                    }
+                    
+                    isStreaming = true;
+                    startBtn.style.display = 'none';
+                    title.innerText = "전송 중...";
+                    statusDiv.innerText = "서버로 프레임을 전송하고 있습니다.";
+                    sendFrameLoop();
+                };
+            } catch (err) {
+                console.error(err);
+                statusDiv.innerText = "카메라 접근 오류: " + err.message;
+                statusDiv.style.color = "#e74c3c";
+            }
+        }
+
+        function sendFrameLoop() {
+            if (!isStreaming) return;
+
+            // 캔버스에 그리기
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // jpeg로 변환하여 전송 (압축률 0.6)
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const formData = new FormData();
+                    formData.append('image', blob, 'frame.jpg');
+
+                    fetch('/upload_frame', {
+                        method: 'POST',
+                        body: formData
+                    }).catch(err => {
+                        console.error('Upload Error:', err);
+                    });
+                }
+            }, 'image/jpeg', 0.6);
+
+            // 약 10fps 전송 제한 (네트워크 부하 방지)
+            setTimeout(() => {
+                requestAnimationFrame(sendFrameLoop);
+            }, 100);
+        }
+
+        startBtn.addEventListener('click', startCamera);
+    </script>
+</body>
+</html>

@@ -98,9 +98,19 @@ class App(ctk.CTk):
         current_prof = self._config.get("current_profile", "default")
         self._safety = SafetyManager(current_profile=current_prof)
         self._env = VehicleEnvironment()
+        
+        from core.web_server import MobileStreamServer
+        self._mobile_server = MobileStreamServer(port=5000)
+        
+        idx_conf = self._config.get("camera_index", 0)
+        stype = "mobile" if str(idx_conf) == "mobile" else "webcam"
+        idx = 0 if stype == "mobile" else int(idx_conf)
+
         self._camera = VideoCamera(
-            device_index=self._config.get("camera_index", 0),
-            mirror_camera=self._config.get("mirror_camera", False)
+            device_index=idx,
+            mirror_camera=self._config.get("mirror_camera", False),
+            source_type=stype,
+            mobile_server=self._mobile_server
         )
         # 카메라에 초기 프로필 데이터 주입
         self._camera.set_active_profile(self._safety.active_profile_data)
@@ -357,12 +367,39 @@ class App(ctk.CTk):
         self._write_log(f"⚙ [수동 제어] 햅틱 진동 변경 ➔ {haptic_str}", "#e74c3c")
 
     def _on_camera_change(self, sel):
-        try:
-            idx = int(sel.split(":")[0])
-        except (ValueError, IndexError):
-            idx = 0
-        self._camera.change_device(idx)
-        self._config.set_and_save("camera_index", idx)
+        key = sel.split(":")[0]
+        if key == "mobile":
+            success, url = self._mobile_server.start()
+            if url:
+                self._show_qr_code(url + "/mobile")
+            else:
+                self._show_qr_code("http://localhost:5000/mobile")
+            self._camera.change_device(source_type="mobile", device_index=None)
+            self._config.set_and_save("camera_index", "mobile")
+        else:
+            try:
+                idx = int(key)
+            except ValueError:
+                idx = 0
+            self._mobile_server.stop()
+            self._camera.change_device(source_type="webcam", device_index=idx)
+            self._config.set_and_save("camera_index", idx)
+            self._driver_seat.reset_ui()
+
+    def _show_qr_code(self, url):
+        import qrcode
+        from PIL import Image
+        
+        qr = qrcode.QRCode(box_size=8, border=2)
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        pil_img = img.get_image()
+        ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(200, 200))
+        
+        self._driver_seat._cam_label.configure(image=ctk_img, text=f"모바일로 QR 스캔\n{url}")
+        self._driver_seat._cam_label._ctk_image = ctk_img
 
     # ═══════════════════════════════════════
     # 환경 시뮬레이터 콜백
@@ -530,15 +567,20 @@ class App(ctk.CTk):
     # ═══════════════════════════════════════
 
     def _get_camera_devices(self):
+        devs = {}
         try:
             from pygrabber.dshow_graph import FilterGraph
-            return {i: n for i, n in enumerate(FilterGraph().get_input_devices())}
+            for i, n in enumerate(FilterGraph().get_input_devices()):
+                devs[str(i)] = n
         except ImportError:
             logger.info("pygrabber 미설치 - 기본 카메라 사용")
-            return {0: "기본 카메라"}
+            devs["0"] = "기본 카메라"
         except RuntimeError as e:
             logger.warning("카메라 장치 조회 실패: %s", e)
-            return {0: "기본 카메라"}
+            devs["0"] = "기본 카메라"
+        
+        devs["mobile"] = "📱 모바일 웹 카메라 (ngrok)"
+        return devs
 
     # ═══════════════════════════════════════
     # AI 자동제어 로그 빌더 (UI 레이어)
@@ -562,6 +604,8 @@ class App(ctk.CTk):
 
     def _on_close(self):
         self._sim.stop()
+        if hasattr(self, '_mobile_server'):
+            self._mobile_server.stop()
         self.destroy()
 
 

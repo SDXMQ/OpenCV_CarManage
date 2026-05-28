@@ -33,9 +33,11 @@ def compute_iou(boxA, boxB):
 
 
 class VideoCamera:
-    def __init__(self, device_index=0, mirror_camera=False, ear_threshold=0.22, drowsy_seconds=3.0, emotion_interval=1.0):
+    def __init__(self, device_index=0, mirror_camera=False, ear_threshold=0.22, drowsy_seconds=3.0, emotion_interval=1.0, source_type="webcam", mobile_server=None):
         self._device_index = device_index
         self.mirror_camera = mirror_camera
+        self.source_type = source_type
+        self.mobile_server = mobile_server
         self._base_ear_threshold = ear_threshold  # 기본 임계값
         self._current_ear_threshold = ear_threshold  # 프로필 보정된 임계값
         self._drowsy_seconds = drowsy_seconds
@@ -121,9 +123,16 @@ class VideoCamera:
     def start(self):
         if self._running:
             return
-        self._cap = cv2.VideoCapture(self._device_index, cv2.CAP_DSHOW)
-        if not self._cap.isOpened():
-            raise RuntimeError(f"카메라 장치({self._device_index})를 열 수 없습니다.")
+            
+        if self.source_type == "webcam":
+            self._cap = cv2.VideoCapture(self._device_index, cv2.CAP_DSHOW)
+            if not self._cap.isOpened():
+                raise RuntimeError(f"카메라 장치({self._device_index})를 열 수 없습니다.")
+        elif self.source_type == "mobile":
+            if not self.mobile_server:
+                raise RuntimeError("모바일 스트리밍 서버가 연결되지 않았습니다.")
+            self._cap = None
+            
         self._running = True
         self._paused = False
 
@@ -146,7 +155,7 @@ class VideoCamera:
             self._capture_thread.join(timeout=2)
         if self._emotion_thread:
             self._emotion_thread.join(timeout=2)
-        if self._cap and self._cap.isOpened():
+        if self._cap and hasattr(self._cap, 'isOpened') and self._cap.isOpened():
             self._cap.release()
         self._cap = None
         with self._lock:
@@ -161,11 +170,14 @@ class VideoCamera:
             self._latest_landmarks = None
             self._tracked_bbox = None
 
-    def change_device(self, device_index):
+    def change_device(self, device_index=None, source_type=None):
         was_running = self._running
         if was_running:
             self.stop()
-        self._device_index = device_index
+        if device_index is not None:
+            self._device_index = device_index
+        if source_type is not None:
+            self.source_type = source_type
         if was_running:
             self.start()
 
@@ -182,13 +194,19 @@ class VideoCamera:
                 time.sleep(0.05)
                 continue
 
-            ret, frame = self._cap.read()
-            if not ret:
-                time.sleep(0.01)
-                continue
+            if self.source_type == "webcam":
+                ret, frame = self._cap.read()
+                if not ret:
+                    time.sleep(0.01)
+                    continue
 
-            if self.mirror_camera:
-                frame = cv2.flip(frame, 1)
+                if self.mirror_camera:
+                    frame = cv2.flip(frame, 1)
+            elif self.source_type == "mobile":
+                frame = self.mobile_server.get_latest_frame()
+                if frame is None:
+                    time.sleep(0.03) # 프레임이 안 들어왔으면 대기
+                    continue
 
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             self._latest_rgb_for_emotion = rgb.copy()

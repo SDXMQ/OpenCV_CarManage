@@ -224,30 +224,23 @@ class AcPanelFrame(ctk.CTkFrame):
             self._haptic_lbl.configure(state="disabled")
         else:
             self._power_switch.configure(state="normal")
+            
+            # 다감각 차량 제어 상태(창문, 오디오, 햅틱 등)는 에어컨 전원과 무관하게 수동 모드면 항상 조작 가능
+            self._vent_lbl.configure(state="normal")
+            self._win_lbl.configure(state="normal")
+            self._air_lbl.configure(state="normal")
+            self._audio_lbl.configure(state="normal")
+            self._seat_lbl.configure(state="normal")
+            self._haptic_lbl.configure(state="normal")
+
             if not power_on:
                 self._ac_switch.configure(state="disabled")
                 self._temp_slider.configure(state="disabled")
                 self._fan_slider.configure(state="disabled")
-                
-                # 전원 꺼졌을 때는 수동 버튼도 비활성화
-                self._vent_lbl.configure(state="disabled")
-                self._win_lbl.configure(state="disabled")
-                self._air_lbl.configure(state="disabled")
-                self._audio_lbl.configure(state="disabled")
-                self._seat_lbl.configure(state="disabled")
-                self._haptic_lbl.configure(state="disabled")
             else:
                 self._ac_switch.configure(state="normal")
                 self._temp_slider.configure(state="normal")
                 self._fan_slider.configure(state="normal")
-                
-                # 전원 켜져 있고 수동 제어 모드일 때는 수동 버튼들 전부 활성화
-                self._vent_lbl.configure(state="normal")
-                self._win_lbl.configure(state="normal")
-                self._air_lbl.configure(state="normal")
-                self._audio_lbl.configure(state="normal")
-                self._seat_lbl.configure(state="normal")
-                self._haptic_lbl.configure(state="normal")
 
     def set_accent_border(self, is_active):
         if is_active:

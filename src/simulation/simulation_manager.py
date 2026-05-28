@@ -213,7 +213,11 @@ class SimulationManager:
 
         # 7. 배터리 소모 계산 (업데이트 주기 33ms = 0.033초 가정)
         dt = 0.033
-        p_drive = 0.1 * self._env.speed / 100.0
+        # 속도 비례 구동 저항 + 공기 저항(속도 세제곱 비례) 물리 계산 모델링
+        # 창문(틸팅) 개방 시 공기 저항이 추가되어 전력 소모 25% 가중치 적용
+        drag_factor = 1.25 if self._env.window_tilting else 1.0
+        v = self._env.speed
+        p_drive = 0.05 * v + (0.00001 * (v ** 3)) * drag_factor
         p_ac = 0.0
         if self._env.power_on:
             if self._env.ac_on:
@@ -229,8 +233,9 @@ class SimulationManager:
         self._env.ac_power_draw = p_ac
         
         # SOC 감소 로직 (에너지 = 전력 * 시간)
-        # 배터리 용량 = kWh 단위 -> 초당 감소율 반영
-        energy_consumed = (p_drive + p_ac) * (dt / 3600.0)
+        # 10배속 속도 조절
+        SIM_SPEED_UP = 10.0
+        energy_consumed = (p_drive + p_ac) * ((dt * SIM_SPEED_UP) / 3600.0)
         soc_decrease = (energy_consumed / self._env.battery_capacity) * 100.0
         self._env.soc = max(0.0, self._env.soc - soc_decrease)
 
