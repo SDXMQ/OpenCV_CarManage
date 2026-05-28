@@ -19,14 +19,23 @@
   - Continuously calculates **EAR (Eye Aspect Ratio)** to evaluate the driver's drowsiness.
   - If the driver keeps their eyes closed below the threshold for more than 3 seconds, it diagnoses the state as `Drowsy` and triggers the safety interlock instantly.
 
-* **❄️ Smart HVAC & Cockpit Control Interlock**
-  - When **AI Auto Mode** is activated, the system dynamically adjusts the cabin temperature, Air Conditioner (A/C) power, and fan speed based on drowsiness or sudden emotion changes.
-  - Example: **Upon detecting drowsiness**, it forces the HVAC power ON, activates A/C cooling, and boosts the fan speed to the maximum to wake the driver up.
+* **🔌 Virtual CAN Bus Network (`python-can` Integration)**
+  - Replaces direct internal function calls with standard CAN message frame-based communication (mimicking real vehicle network ECUs).
+  - Encodes telemetry and control signals into standard 8-byte payloads. Broadcasts `0x110` (Driver State), `0x120` (Face Metrics), and `0x210` (ECU Control Commands) frames over a virtual CAN channel.
+
+* **📡 IoT Digital Twin & Fleet Telemetry (MQTT)**
+  - Implements a digital twin telemetry pipeline that assigns a random Vehicle ID (e.g., `SEAVS-EV-1234`) and publishes real-time vehicle parameters (SOC, Cabin Temp, speed, CO2, etc.) to a public broker (`broker.hivemq.com`) on a background thread.
+  - **Independent Fleet Monitor**: Features a separate dashboard (`fleet_monitor.py`) subscribing to live telemetry data to visualize fleet connectivity and real-time statuses.
+
+* **🔋 Cabin Power Physics & Multi-Objective HVAC Solver**
+  - Realistically models cabin power draw under cooling (compressor), heating (PTC heater), and simple ventilation.
+  - Optimizes climate settings under critical driver states using a weighted Grid Search solver—automatically balancing Battery SOC ($w_1$) and Driver Alertness ($w_2$) to select optimal temperature and fan settings.
+  - Includes a quick charge button to restore the virtual battery to 100% on demand.
 
 * **📊 Premium Dark-Themed Cockpit GUI**
   - Built with **CustomTkinter** for a sleek, modern, and high-tech dark-themed cockpit design.
-  - **Live Video Feed**: Displays the real-time camera stream rendered with bounding boxes and landmark points.
-  - **System Logs & Safety Alerts**: Provides chronological logging and color-coded interactive safety banner alerts.
+  - **Live Video Feed**: Displays the real-time camera stream rendered with bounding boxes and landmark points. Optimized with high-speed bilinear interpolation to eliminate resize lag.
+  - **Layout Optimization**: Utilizes a tabbed control console (`🔋 Battery` and `🌍 Environment` tabs) to optimize vertical screen space for low-resolution/high-scaling displays.
   - **Air Vent Animation**: Displays interactive airflow motion graphics and spinning fan animations reacting to the current fan speed and cooling status.
 
 ---
@@ -36,7 +45,7 @@
 * **Language:** `Python 3.10+`
 * **UI Framework:** `CustomTkinter`, `Pillow`
 * **AI & Computer Vision:** `OpenCV (opencv-python)` (DNN module for ONNX model inference), `MediaPipe`
-* **Protocols & Utilities:** `paho-mqtt` (Optional legacy telemetry client), `pygrabber` (for automated camera device list querying)
+* **Protocols & Utilities:** `python-can` (Virtual CAN Bus network layer), `paho-mqtt` (IoT telemetry client), `pygrabber` (for automated camera device list querying)
 
 ---
 
@@ -46,8 +55,9 @@
 OpenCV_CarManage/
 │
 ├── requirements.txt      # Project library dependencies
-├── run.bat              # One-click virtualenv builder & run script
-├── plan.txt             # Development architecture & plan draft
+├── run.bat              # One-click virtualenv builder & launches both Simulator + Fleet Monitor
+├── settings.txt         # Saved configuration/preferences
+├── fleet_monitor.py     # IoT Fleet Management Dashboard GUI (MQTT client)
 │
 └── src/
     ├── main.py          # Application entry point (Initializes UI and main loop)
@@ -55,7 +65,8 @@ OpenCV_CarManage/
     ├── core/            # Core business logic and states
     │   ├── config_manager.py  # Handles system preferences (saving/loading config)
     │   ├── safety_system.py   # Analyzes drowsiness and flags critical hazard warnings
-    │   └── vehicle_env.py     # Models virtual cabin physical environments (temp, AC states)
+    │   ├── vehicle_env.py     # Models virtual cabin physical environments (temp, AC states, SOC)
+    │   └── can_bus.py         # [NEW] VirtualCANBus interface wrapper using python-can
     │
     ├── vision/          # Computer vision and AI pipelines
     │   ├── camera.py          # Multi-threaded camera device frames capture
@@ -65,12 +76,12 @@ OpenCV_CarManage/
     │   └── emotion_ferplus.onnx  # Deep learning emotion recognition model weights
     │
     ├── simulation/      # Virtual environment simulation
-    │   └── simulation_manager.py # Syncs AI outputs and feeds telemetry data back to cabin
+    │   └── simulation_manager.py # Controls CAN/MQTT tasks and multi-objective A/C optimizer solver
     │
     └── ui/              # CustomTkinter dashboard elements
         ├── header.py          # Top navigation (Auto Mode toggle, Audio toggle)
-        ├── driver_seat.py     # Camera viewport and driver status monitoring panel
-        ├── center_display.py  # Logs screen, detail charts, and safety banners
+        ├── driver_seat.py     # Camera viewport and driver status monitoring panel (optimized Bilinear)
+        ├── center_display.py  # Logs screen, detail charts, tabbed control & battery panel
         ├── ac_panel.py        # Interactive HVAC system controls & air motion graphics
         └── tooltip.py         # CustomTkinter hover tooltip utility
 ```
@@ -79,11 +90,12 @@ OpenCV_CarManage/
 
 ## 🚀 How to Run
 
-This project provides a one-click batch script (`run.bat`) for Windows users to automatically prepare the virtual environment and launch the dashboard.
+This project provides a one-click batch script (`run.bat`) for Windows users to automatically prepare the virtual environment, install dependencies, and launch both screens concurrently.
 
 ### 1. Prerequisites
 * A PC with a connected webcam.
 * Python 3.10 or higher installed (Make sure Python is added to your PATH env).
+* (Optional) An active internet connection for the public HiveMQ MQTT broker telemetric updates.
 
 ### 2. Execution
 Run **`run.bat`** in the project root folder (Double-click or run from CLI):
@@ -93,8 +105,8 @@ Run **`run.bat`** in the project root folder (Double-click or run from CLI):
 ```
 * **What it does:**
   1. Detects and builds a Python virtual environment (`venv`) if not present.
-  2. Activates the virtual environment and installs required libraries silently.
-  3. Launches the application by executing `src/main.py`.
+  2. Activates the virtual environment and installs required libraries (`python-can`, `paho-mqtt`, etc.) silently.
+  3. Launches **both** the Cockpit Simulator (`src/main.py`) and the IoT Fleet Monitor (`fleet_monitor.py`) in separate processes simultaneously.
 
 ---
 
