@@ -119,7 +119,7 @@ class DriverSeatFrame(ctk.CTkFrame):
                 iw, ih = pil.size
                 r = min(lw / iw, lh / ih)
                 new_w, new_h = int(iw * r), int(ih * r)
-                pil = pil.resize((new_w, new_h), Image.LANCZOS)
+                pil = pil.resize((new_w, new_h), Image.BILINEAR)
                 img = ctk.CTkImage(light_image=pil, dark_image=pil, size=pil.size)
                 self._cam_label.configure(image=img, text="")
                 self._cam_label._ctk_image = img

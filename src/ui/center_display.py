@@ -21,8 +21,7 @@ class CenterDisplayFrame(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=1)
-        self.grid_rowconfigure(3, weight=1)
-        self.grid_rowconfigure(4, weight=2)
+        self.grid_rowconfigure(3, weight=2)
 
         # 1. 타이틀
         tf = ctk.CTkFrame(self, fg_color="#0d0d18", height=34, corner_radius=0)
@@ -56,9 +55,20 @@ class CenterDisplayFrame(ctk.CTkFrame):
                                        font=ctk.CTkFont(size=14, weight="bold"))
         self._alert_lbl.pack(pady=6, padx=10)
 
-        # 3. 환경 시뮬레이터 패널
-        env_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
-        env_f.grid(row=2, column=0, sticky="nsew", padx=10, pady=(4, 4))
+        # 3. 배터리 & 환경 시뮬레이터 탭 패널 (스택 통합으로 세로 공간 절약)
+        self.tabview = ctk.CTkTabview(self, fg_color=self._screen_color, corner_radius=10,
+                                      segmented_button_selected_color=self._accent,
+                                      segmented_button_unselected_color="#181824",
+                                      text_color=self._main_color)
+        self.tabview.grid(row=2, column=0, sticky="nsew", padx=10, pady=(4, 4))
+        
+        self.tabview.add("🔋 Battery")
+        self.tabview.add("🌍 Environment")
+        
+        bat_f = self.tabview.tab("🔋 Battery")
+        env_f = self.tabview.tab("🌍 Environment")
+
+        # --- Environment Tab 설정 ---
         env_f.grid_columnconfigure(0, weight=1)
         env_f.grid_columnconfigure(1, weight=1)
 
@@ -112,11 +122,7 @@ class CenterDisplayFrame(ctk.CTkFrame):
         self._spd_slider.set(80)
         self._spd_slider.pack(fill="x")
 
-
-
-        # 4. 배터리 및 최적화 상태 (BATTERY & OPTIMIZER STATUS)
-        bat_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
-        bat_f.grid(row=3, column=0, sticky="nsew", padx=10, pady=(4, 4))
+        # --- Battery Tab 설정 ---
         bat_f.grid_columnconfigure(0, weight=1)
         bat_f.grid_columnconfigure(1, weight=1)
 
@@ -142,9 +148,9 @@ class CenterDisplayFrame(ctk.CTkFrame):
         self._opt_lbl = ctk.CTkLabel(bat_f, text="Opt: Standby", font=ctk.CTkFont(family="Consolas", size=10), text_color="#f39c12")
         self._opt_lbl.grid(row=2, column=1, padx=15, sticky="e", pady=(0, 8))
 
-        # 5. AI 시스템 로그 창
+        # 5. AI 시스템 로그 창 (Row 3으로 상향 조정)
         log_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
-        log_f.grid(row=4, column=0, sticky="nsew", padx=10, pady=(4, 10))
+        log_f.grid(row=3, column=0, sticky="nsew", padx=10, pady=(4, 10))
         log_f.grid_columnconfigure(0, weight=1)
         log_f.grid_rowconfigure(1, weight=1)
 

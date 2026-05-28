@@ -83,8 +83,8 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("SEAVS - Smart Emotion-Aware Vehicle System")
-        self.geometry("1200x820")
-        self.minsize(1100, 750)
+        self.geometry("1200x700")
+        self.minsize(1100, 650)
         self.configure(fg_color=self._BG)
         ctk.set_appearance_mode("dark")
 
@@ -135,11 +135,9 @@ class App(ctk.CTk):
             on_settings_click=self._on_settings_click,
             accent_color=self._ACCENT
         )
-        self._header.pack(fill="x")
 
         # 바디 레이아웃
         body = ctk.CTkFrame(self, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=12, pady=(5, 0))
         body.grid_columnconfigure(0, weight=5)
         body.grid_columnconfigure(1, weight=4)
         body.grid_rowconfigure(0, weight=1)
@@ -200,7 +198,11 @@ class App(ctk.CTk):
             accent_color=self._ACCENT,
             main_color=self._MAIN
         )
-        self._ac_panel.pack(fill="x", padx=12, pady=(5, 10))
+        
+        # 레이아웃 배치 우선순위 적용 (에어컨 패널이 항상 하단에 보이도록 보장)
+        self._header.pack(side="top", fill="x")
+        self._ac_panel.pack(side="bottom", fill="x", padx=12, pady=(5, 10))
+        body.pack(side="top", fill="both", expand=True, padx=12, pady=(5, 0))
 
 
     # ═══════════════════════════════════════
