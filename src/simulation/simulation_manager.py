@@ -346,6 +346,16 @@ class SimulationManager:
         ]
         self.can_bus.send(0x210, cmd_data)
         
+        # CAN 메시지 유실 및 지연을 방지하기 위해 로컬 환경 변수에 즉시 반영
+        self._env.power_on = preset.get("power_on", True)
+        self._env.ac_on = preset.get("ac_on", False)
+        self.target_temp = preset.get("ac_temp", 22)
+        self.target_fan = preset.get("ac_fan_speed", 1)
+        self._env.ventilation_mode = preset.get("ventilation_mode", "internal")
+        self._env.window_tilting = preset.get("window_tilting", False)
+        self._env.airflow_direction = preset.get("airflow_direction", "indirect")
+        self._env.haptic_vibration = preset.get("haptic_vibration", False)
+        
         # 다감각 제어 상태는 환경 변수와 디스플레이에 즉각 업데이트할 항목들(여기서는 직접 반영)
         # (CAN을 통해 수신 처리할 수도 있지만, 로컬 지연 보상을 위해)
         self._env.audio_genre = preset.get("audio_genre", "None")

@@ -19,10 +19,9 @@ class CenterDisplayFrame(ctk.CTkFrame):
         self._main_color = main_color
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0) # Driver State (Fixed height)
-        self.grid_rowconfigure(2, weight=0) # Battery Frame (Fixed height)
-        self.grid_rowconfigure(3, weight=0) # Environment Frame (Fixed height)
-        self.grid_rowconfigure(4, weight=1) # AI Log Frame (Takes remaining space)
+        self.grid_rowconfigure(1, weight=0, minsize=140) # Driver State Card: 최소 높이 140
+        self.grid_rowconfigure(2, weight=0, minsize=170) # Simulator (Symmetric Battery & Env): 최소 높이 170
+        self.grid_rowconfigure(3, weight=1) # AI Log Frame (Takes remaining space)
 
         # 1. 타이틀
         tf = ctk.CTkFrame(self, fg_color="#0d0d18", height=34, corner_radius=0)
@@ -36,10 +35,11 @@ class CenterDisplayFrame(ctk.CTkFrame):
         status = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
         status.grid(row=1, column=0, sticky="nsew", padx=10, pady=(8, 4))
         status.grid_columnconfigure(0, weight=1)
+        status.grid_rowconfigure((0, 1, 2, 3), weight=0)
 
         ctk.CTkLabel(status, text="DRIVER STATE",
                      font=ctk.CTkFont(family="Consolas", size=10),
-                     text_color=self._accent).grid(row=0, column=0, padx=15, pady=(10, 2), sticky="w")
+                     text_color=self._accent).grid(row=0, column=0, padx=15, pady=(8, 2), sticky="w")
 
         self._state_main = ctk.CTkLabel(status, text="😐 정상",
                                       font=ctk.CTkFont(size=28, weight="bold"), text_color=self._main_color)
@@ -49,100 +49,107 @@ class CenterDisplayFrame(ctk.CTkFrame):
                                         font=ctk.CTkFont(family="Consolas", size=11), text_color=self._dim_color)
         self._state_scores.grid(row=2, column=0, padx=15, sticky="w", pady=(0, 4))
 
-        # 경고 알림판
+        # 경고 알림판 (레이아웃 크기 고정)
         self._alert_f = ctk.CTkFrame(status, corner_radius=8, fg_color="transparent", height=44)
         self._alert_f.grid(row=3, column=0, padx=15, pady=(4, 10), sticky="ew")
+        self._alert_f.pack_propagate(False)
         self._alert_lbl = ctk.CTkLabel(self._alert_f, text="",
                                        font=ctk.CTkFont(size=14, weight="bold"))
-        self._alert_lbl.pack(pady=6, padx=10)
+        self._alert_lbl.pack(expand=True, fill="both")
 
-        # 3. 배터리 프레임 (동시 노출)
-        bat_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
-        bat_f.grid(row=2, column=0, sticky="ew", padx=10, pady=(4, 4))
-        bat_f.grid_columnconfigure(0, weight=1)
-        bat_f.grid_columnconfigure(1, weight=1)
+        # 3. 통합 시뮬레이터 프레임 (대칭 가로 분할로 찌그러짐 예방 및 상시 노출)
+        sim_f = ctk.CTkFrame(self, fg_color="transparent")
+        sim_f.grid(row=2, column=0, sticky="nsew", padx=10, pady=(4, 4))
+        sim_f.grid_columnconfigure(0, weight=1) # 좌측 배터리
+        sim_f.grid_columnconfigure(1, weight=1) # 우측 환경시뮬레이터
+        sim_f.grid_rowconfigure(0, weight=1)
 
-        ctk.CTkLabel(bat_f, text="🔋 BATTERY & OPTIMIZER",
+        # 3-A. 좌측 배터리 카드
+        bat_card = ctk.CTkFrame(sim_f, fg_color=self._screen_color, corner_radius=10)
+        bat_card.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        bat_card.grid_columnconfigure(0, weight=1)
+        bat_card.grid_rowconfigure((0, 1, 2, 3), weight=0)
+
+        ctk.CTkLabel(bat_card, text="🔋 BATTERY & OPTIMIZER",
                      font=ctk.CTkFont(family="Consolas", size=10),
-                     text_color=self._accent).grid(row=0, column=0, columnspan=2, padx=15, pady=(8, 4), sticky="w")
-                     
-        soc_frame = ctk.CTkFrame(bat_f, fg_color="transparent")
-        soc_frame.grid(row=1, column=0, padx=15, sticky="w", pady=(0, 4))
-        self._soc_bar = ctk.CTkProgressBar(soc_frame, width=150, height=12, progress_color="#2ecc71")
+                     text_color=self._accent).grid(row=0, column=0, padx=15, pady=(8, 4), sticky="w")
+
+        soc_frame = ctk.CTkFrame(bat_card, fg_color="transparent")
+        soc_frame.grid(row=1, column=0, padx=15, sticky="ew", pady=2)
+        self._soc_bar = ctk.CTkProgressBar(soc_frame, height=12, progress_color="#2ecc71")
         self._soc_bar.set(1.0)
-        self._soc_bar.pack(side="left", padx=(0, 10))
+        self._soc_bar.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self._soc_lbl = ctk.CTkLabel(soc_frame, text="100.0%", font=ctk.CTkFont(size=12, weight="bold"))
-        self._soc_lbl.pack(side="left")
+        self._soc_lbl.pack(side="right")
 
-        self._power_lbl = ctk.CTkLabel(bat_f, text="Draw: 0.00 kW", font=ctk.CTkFont(size=11), text_color=self._dim_color)
-        self._power_lbl.grid(row=2, column=0, padx=15, sticky="w", pady=(0, 8))
+        info_frame = ctk.CTkFrame(bat_card, fg_color="transparent")
+        info_frame.grid(row=2, column=0, padx=15, sticky="ew", pady=2)
+        self._power_lbl = ctk.CTkLabel(info_frame, text="Draw: 0.00 kW", font=ctk.CTkFont(size=11), text_color=self._dim_color)
+        self._power_lbl.pack(side="left")
+        self._opt_lbl = ctk.CTkLabel(info_frame, text="Opt: Standby", font=ctk.CTkFont(family="Consolas", size=10), text_color="#f39c12")
+        self._opt_lbl.pack(side="right")
 
-        self._charge_btn = ctk.CTkButton(bat_f, text="⚡ 급속 충전", width=80, height=24, font=ctk.CTkFont(size=11, weight="bold"),
+        btn_frame = ctk.CTkFrame(bat_card, fg_color="transparent")
+        btn_frame.grid(row=3, column=0, padx=15, sticky="ew", pady=(2, 8))
+        self._charge_btn = ctk.CTkButton(btn_frame, text="⚡ 급속 충전", height=24, font=ctk.CTkFont(size=11, weight="bold"),
                                          fg_color="#e67e22", hover_color="#d35400", command=on_charge_click)
-        self._charge_btn.grid(row=1, column=1, padx=15, sticky="e")
+        self._charge_btn.pack(fill="x", expand=True)
 
-        self._opt_lbl = ctk.CTkLabel(bat_f, text="Opt: Standby", font=ctk.CTkFont(family="Consolas", size=10), text_color="#f39c12")
-        self._opt_lbl.grid(row=2, column=1, padx=15, sticky="e", pady=(0, 8))
+        # 3-B. 우측 환경 시뮬레이터 카드 (속도 스크롤 상시 보장)
+        env_card = ctk.CTkFrame(sim_f, fg_color=self._screen_color, corner_radius=10)
+        env_card.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
+        env_card.grid_columnconfigure(0, weight=1)
+        env_card.grid_rowconfigure((0, 1, 2, 3), weight=0)
 
-        # 4. 환경 시뮬레이터 프레임 (동시 노출 - 속도 슬라이더 포함)
-        env_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
-        env_f.grid(row=3, column=0, sticky="ew", padx=10, pady=(4, 4))
-        env_f.grid_columnconfigure(0, weight=1)
-        env_f.grid_columnconfigure(1, weight=1)
-
-        ctk.CTkLabel(env_f, text="🌍 ENVIRONMENT SIMULATOR",
+        ctk.CTkLabel(env_card, text="🌍 ENVIRONMENT SIMULATOR",
                      font=ctk.CTkFont(family="Consolas", size=10),
-                     text_color=self._accent).grid(row=0, column=0, columnspan=2, padx=15, pady=(8, 4), sticky="w")
+                     text_color=self._accent).grid(row=0, column=0, padx=15, pady=(8, 4), sticky="w")
 
-        # 좌측: 스위치 (눈부심, 터널)
-        sw_f = ctk.CTkFrame(env_f, fg_color="transparent")
-        sw_f.grid(row=1, column=0, padx=15, pady=(0, 8), sticky="w")
-
-        self._glare_sw = ctk.CTkSwitch(sw_f, text="☀ 눈부심",
+        # 스위치 영역 (눈부심, 터널)
+        sw_frame = ctk.CTkFrame(env_card, fg_color="transparent")
+        sw_frame.grid(row=1, column=0, padx=15, sticky="ew", pady=2)
+        self._glare_sw = ctk.CTkSwitch(sw_frame, text="☀ 눈부심",
                                        variable=glare_var, command=on_glare_toggle,
                                        progress_color="#f39c12",
-                                       font=ctk.CTkFont(size=11))
-        self._glare_sw.pack(anchor="w", pady=2)
-
-        self._tunnel_sw = ctk.CTkSwitch(sw_f, text="🌑 터널/야간",
+                                       font=ctk.CTkFont(size=10))
+        self._glare_sw.pack(side="left", expand=True)
+        self._tunnel_sw = ctk.CTkSwitch(sw_frame, text="🌑 야간/터널",
                                         variable=tunnel_var, command=on_tunnel_toggle,
                                         progress_color="#95a5a6",
-                                        font=ctk.CTkFont(size=11))
-        self._tunnel_sw.pack(anchor="w", pady=2)
+                                        font=ctk.CTkFont(size=10))
+        self._tunnel_sw.pack(side="right", expand=True)
 
-        # 우측: 슬라이더 (CO2, 속도)
-        sl_f = ctk.CTkFrame(env_f, fg_color="transparent")
-        sl_f.grid(row=1, column=1, padx=(0, 15), pady=(0, 8), sticky="ew")
-
-        co2_row = ctk.CTkFrame(sl_f, fg_color="transparent")
-        co2_row.pack(fill="x", pady=2)
-        ctk.CTkLabel(co2_row, text="CO₂", font=ctk.CTkFont(size=10), text_color=self._dim_color).pack(side="left")
-        self._co2_lbl = ctk.CTkLabel(co2_row, text="800 ppm",
-                                     font=ctk.CTkFont(family="Consolas", size=10, weight="bold"),
-                                     text_color=self._main_color)
+        # CO2 슬라이더 영역
+        co2_frame = ctk.CTkFrame(env_card, fg_color="transparent")
+        co2_frame.grid(row=2, column=0, padx=15, sticky="ew", pady=2)
+        co2_title = ctk.CTkFrame(co2_frame, fg_color="transparent")
+        co2_title.pack(fill="x")
+        ctk.CTkLabel(co2_title, text="CO₂ 농도", font=ctk.CTkFont(size=10), text_color=self._dim_color).pack(side="left")
+        self._co2_lbl = ctk.CTkLabel(co2_title, text="800 ppm", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"))
         self._co2_lbl.pack(side="right")
-        self._co2_slider = ctk.CTkSlider(sl_f, from_=400, to=2500, number_of_steps=42,
-                                         command=on_co2_change, height=14,
+        self._co2_slider = ctk.CTkSlider(co2_frame, from_=400, to=2500, number_of_steps=42,
+                                         command=on_co2_change, height=12,
                                          button_color="#e67e22")
         self._co2_slider.set(800)
-        self._co2_slider.pack(fill="x", pady=(0, 4))
+        self._co2_slider.pack(fill="x", expand=True)
 
-        spd_row = ctk.CTkFrame(sl_f, fg_color="transparent")
-        spd_row.pack(fill="x", pady=2)
-        ctk.CTkLabel(spd_row, text="속도", font=ctk.CTkFont(size=10), text_color=self._dim_color).pack(side="left")
-        self._spd_lbl = ctk.CTkLabel(spd_row, text="80 km/h",
-                                     font=ctk.CTkFont(family="Consolas", size=10, weight="bold"),
-                                     text_color=self._main_color)
+        # 속도 슬라이더 영역
+        spd_frame = ctk.CTkFrame(env_card, fg_color="transparent")
+        spd_frame.grid(row=3, column=0, padx=15, sticky="ew", pady=(2, 8))
+        spd_title = ctk.CTkFrame(spd_frame, fg_color="transparent")
+        spd_title.pack(fill="x")
+        ctk.CTkLabel(spd_title, text="주행 속도", font=ctk.CTkFont(size=10), text_color=self._dim_color).pack(side="left")
+        self._spd_lbl = ctk.CTkLabel(spd_title, text="80 km/h", font=ctk.CTkFont(family="Consolas", size=10, weight="bold"))
         self._spd_lbl.pack(side="right")
-        self._spd_slider = ctk.CTkSlider(sl_f, from_=0, to=200, number_of_steps=40,
-                                         command=on_speed_change, height=14,
+        self._spd_slider = ctk.CTkSlider(spd_frame, from_=0, to=200, number_of_steps=40,
+                                         command=on_speed_change, height=12,
                                          button_color="#3498db")
         self._spd_slider.set(80)
-        self._spd_slider.pack(fill="x")
+        self._spd_slider.pack(fill="x", expand=True)
 
-        # 5. AI 시스템 로그 창 (Row 4로 조정)
+        # 5. AI 시스템 로그 창 (Row 3으로 복귀 및 가변 팽창 허용)
         log_f = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=10)
-        log_f.grid(row=4, column=0, sticky="nsew", padx=10, pady=(4, 10))
+        log_f.grid(row=3, column=0, sticky="nsew", padx=10, pady=(4, 10))
         log_f.grid_columnconfigure(0, weight=1)
         log_f.grid_rowconfigure(1, weight=1)
 

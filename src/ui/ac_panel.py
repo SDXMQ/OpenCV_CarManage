@@ -153,9 +153,20 @@ class AcPanelFrame(ctk.CTkFrame):
 
         self._cabin_val.configure(text=f"{cabin_temp:.1f}°C")
         self._set_val.configure(text=f"{ac_temp}°C")
-        self._temp_slider.set(ac_temp)
         self._fan_val.configure(text=f"{ac_fan_speed} 단")
+
+        # 슬라이더 강제 업데이트 (disabled 우회)
+        t_state = self._temp_slider.cget("state")
+        f_state = self._fan_slider.cget("state")
+        
+        self._temp_slider.configure(state="normal")
+        self._fan_slider.configure(state="normal")
+        
+        self._temp_slider.set(ac_temp)
         self._fan_slider.set(ac_fan_speed)
+        
+        self._temp_slider.configure(state=t_state)
+        self._fan_slider.configure(state=f_state)
 
         color = "#2ecc71"
         if cabin_temp >= 26.0:
@@ -166,46 +177,61 @@ class AcPanelFrame(ctk.CTkFrame):
         self._cabin_val.configure(text_color=color)
         self._cabin_title.configure(text_color=color)
 
+    def force_update_switches(self, power_on, ac_on, power_var, ac_var):
+        """AI 모드 등으로 인해 스위치가 disabled 상태일 때 값을 강제로 업데이트하기 위한 우회 메서드"""
+        current_state = self._power_switch.cget("state")
+        
+        # 값을 업데이트하기 위해 잠시 normal 상태로 변경
+        self._power_switch.configure(state="normal")
+        self._ac_switch.configure(state="normal")
+        
+        power_var.set(power_on)
+        ac_var.set(ac_on)
+        
+        # 원래 상태로 복구
+        self._power_switch.configure(state=current_state)
+        self._ac_switch.configure(state=current_state)
+
     def update_vehicle_status(self, vent_mode, window, airflow, genre, volume,
                               seat_vent, seat_heat, haptic):
         """다감각 제어 상태 배지를 실시간으로 업데이트한다."""
         # 환기
         if vent_mode == "external":
-            self._vent_lbl.configure(text="💨 외기유입", text_color="#00d2ff")
+            self._vent_lbl.configure(text="💨 외기유입", text_color="#00d2ff", text_color_disabled="#00d2ff")
         else:
-            self._vent_lbl.configure(text="♻ 내기순환", text_color="#8899aa")
+            self._vent_lbl.configure(text="♻ 내기순환", text_color="#8899aa", text_color_disabled="#8899aa")
 
         # 창문
         if window:
-            self._win_lbl.configure(text="🪟 틸팅 열림", text_color="#f39c12")
+            self._win_lbl.configure(text="🪟 틸팅 열림", text_color="#f39c12", text_color_disabled="#f39c12")
         else:
-            self._win_lbl.configure(text="🪟 닫힘", text_color="#8899aa")
+            self._win_lbl.configure(text="🪟 닫힘", text_color="#8899aa", text_color_disabled="#8899aa")
 
         # 풍향
         if airflow == "direct":
-            self._air_lbl.configure(text="🌀 직바람", text_color="#e74c3c")
+            self._air_lbl.configure(text="🌀 직바람", text_color="#e74c3c", text_color_disabled="#e74c3c")
         else:
-            self._air_lbl.configure(text="🍃 간접풍", text_color="#8899aa")
+            self._air_lbl.configure(text="🍃 간접풍", text_color="#8899aa", text_color_disabled="#8899aa")
 
         # 오디오
         if genre and genre != "None":
-            self._audio_lbl.configure(text=f"🎵 {genre} {volume}%", text_color="#2ecc71")
+            self._audio_lbl.configure(text=f"🎵 {genre} {volume}%", text_color="#2ecc71", text_color_disabled="#2ecc71")
         else:
-            self._audio_lbl.configure(text="🎵 None", text_color="#8899aa")
+            self._audio_lbl.configure(text="🎵 None", text_color="#8899aa", text_color_disabled="#8899aa")
 
         # 시트
         if seat_vent > 0:
-            self._seat_lbl.configure(text=f"💺 통풍 {seat_vent}단", text_color="#00d2ff")
+            self._seat_lbl.configure(text=f"💺 통풍 {seat_vent}단", text_color="#00d2ff", text_color_disabled="#00d2ff")
         elif seat_heat > 0:
-            self._seat_lbl.configure(text=f"♨ 열선 {seat_heat}단", text_color="#e67e22")
+            self._seat_lbl.configure(text=f"♨ 열선 {seat_heat}단", text_color="#e67e22", text_color_disabled="#e67e22")
         else:
-            self._seat_lbl.configure(text="💺 OFF", text_color="#8899aa")
+            self._seat_lbl.configure(text="💺 OFF", text_color="#8899aa", text_color_disabled="#8899aa")
 
         # 햅틱
         if haptic:
-            self._haptic_lbl.configure(text="📳 진동 ON", text_color="#e74c3c")
+            self._haptic_lbl.configure(text="📳 진동 ON", text_color="#e74c3c", text_color_disabled="#e74c3c")
         else:
-            self._haptic_lbl.configure(text="📳 OFF", text_color="#8899aa")
+            self._haptic_lbl.configure(text="📳 OFF", text_color="#8899aa", text_color_disabled="#8899aa")
 
     def set_interactive_state(self, power_on, auto_mode):
         # 1. HVAC 슬라이더 및 스위치 인터랙션 상태 정의
@@ -225,7 +251,7 @@ class AcPanelFrame(ctk.CTkFrame):
         else:
             self._power_switch.configure(state="normal")
             
-            # 다감각 차량 제어 상태(창문, 오디오, 햅틱 등)는 에어컨 전원과 무관하게 수동 모드면 항상 조작 가능
+            # 다감각 차량 제어 상태(창문, 오디오, 햅틱 등)는 수동 모드에서 조작 가능하도록 활성화
             self._vent_lbl.configure(state="normal")
             self._win_lbl.configure(state="normal")
             self._air_lbl.configure(state="normal")

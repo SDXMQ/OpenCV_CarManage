@@ -11,5 +11,3 @@ pip install -r requirements.txt --quiet
 set PYTHONPATH=%~dp0
 start "" python src\main.py
 start "" python fleet_monitor.py
-
-pause

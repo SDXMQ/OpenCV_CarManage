@@ -37,7 +37,7 @@ class DriverSeatFrame(ctk.CTkFrame):
         self._cam_label.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
 
         # 3. 운전자 상태 요약 스트립 (3열: 상태 | EAR | MAR)
-        strip = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=8, height=60)
+        strip = ctk.CTkFrame(self, fg_color=self._screen_color, corner_radius=8, height=70)
         strip.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
         strip.grid_propagate(False)
         strip.grid_columnconfigure((0, 1, 2), weight=1)

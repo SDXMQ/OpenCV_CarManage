@@ -128,6 +128,8 @@ class App(ctk.CTk):
         self._tunnel_var = ctk.BooleanVar(value=False)
         self._co2_var = ctk.DoubleVar(value=800.0)
         self._speed_var = ctk.DoubleVar(value=80.0)
+        
+        self._last_auto_log = None
 
 
         # 3. UI 그리기 및 장착
@@ -531,13 +533,17 @@ class App(ctk.CTk):
                 log_text = self._build_auto_log(
                     data["ai_state_key"], data["ai_adjustments"], data["ai_preset"]
                 )
-                log_color = self._get_auto_log_color(
-                    data["ai_state_key"], data["ai_adjustments"]
-                )
-                self._write_log(log_text, log_color)
+                if log_text != self._last_auto_log:
+                    log_color = self._get_auto_log_color(
+                        data["ai_state_key"], data["ai_adjustments"]
+                    )
+                    self._write_log(log_text, log_color)
+                    self._last_auto_log = log_text
 
-            self._power_var.set(data["power_on"])
-            self._ac_var.set(data["ac_on"])
+            self._ac_panel.force_update_switches(
+                data["power_on"], data["ac_on"], 
+                self._power_var, self._ac_var
+            )
             self._ac_panel.set_interactive_state(data["power_on"], True)
 
         # 에어컨 상태 UI 동적 피드백 동기화 (자동/수동 공통)
